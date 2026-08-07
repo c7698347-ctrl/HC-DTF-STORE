@@ -14,7 +14,9 @@ import {
   Layers,
   Sparkles,
   Tag,
-  AlertCircle
+  AlertCircle,
+  Flame,
+  Star
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import { DEFAULT_CATEGORIES } from '@/lib/store';
@@ -35,6 +37,8 @@ export default function AdminProductsPage() {
   const [stock, setStock] = useState('100');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('Published'); // 'Published' or 'Draft'
+  const [isTrending, setIsTrending] = useState(false);
+  const [isNewArrival, setIsNewArrival] = useState(true);
   const [images, setImages] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -47,6 +51,8 @@ export default function AdminProductsPage() {
     setStock('100');
     setDescription('');
     setStatus('Published');
+    setIsTrending(false);
+    setIsNewArrival(true);
     setImages([]);
     setEditingProduct(null);
   };
@@ -91,6 +97,8 @@ export default function AdminProductsPage() {
       stock: Number(stock) || 0,
       description,
       status,
+      isTrending,
+      isNewArrival,
       images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800']
     };
 
@@ -114,6 +122,8 @@ export default function AdminProductsPage() {
     setStock(p.stock);
     setDescription(p.description || '');
     setStatus(p.status || 'Published');
+    setIsTrending(!!p.isTrending);
+    setIsNewArrival(p.isNewArrival !== false);
     setImages(p.images || []);
     setShowAddModal(true);
   };
@@ -134,7 +144,7 @@ export default function AdminProductsPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
         <div>
           <h1 className="text-2xl sm:text-4xl font-black text-white">Product Catalog Manager</h1>
-          <p className="text-xs text-slate-400 mt-1">Upload products directly into default system categories with live search tags</p>
+          <p className="text-xs text-slate-400 mt-1">Upload & edit products, manage stock levels, set prices, and toggle Trending / New Arrivals</p>
         </div>
 
         <button
@@ -162,7 +172,7 @@ export default function AdminProductsPage() {
         </div>
 
         <span className="text-xs text-slate-400 font-bold">
-          Total Published Products: <strong className="text-white">{products.length}</strong>
+          Total Store Products: <strong className="text-white">{products.length}</strong>
         </span>
       </div>
 
@@ -173,9 +183,9 @@ export default function AdminProductsPage() {
             <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider font-bold text-[11px]">
               <tr>
                 <th className="p-4">Product</th>
-                <th className="p-4">Default Category</th>
-                <th className="p-4">Search Tags</th>
-                <th className="p-4">Price & Discount</th>
+                <th className="p-4">Category</th>
+                <th className="p-4">Badges</th>
+                <th className="p-4">Price & Offer</th>
                 <th className="p-4">Stock</th>
                 <th className="p-4">Status</th>
                 <th className="p-4 text-right">Actions</th>
@@ -213,18 +223,19 @@ export default function AdminProductsPage() {
                       </span>
                     </td>
 
-                    <td className="p-4 max-w-xs">
-                      {Array.isArray(p.tags) && p.tags.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {p.tags.slice(0, 4).map((t, idx) => (
-                            <span key={idx} className="px-2 py-0.5 bg-slate-950 text-slate-300 text-[10px] rounded font-mono">
-                              #{t}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-slate-500 italic">No tags</span>
-                      )}
+                    <td className="p-4">
+                      <div className="flex flex-wrap gap-1">
+                        {p.isTrending && (
+                          <span className="px-2 py-0.5 bg-rose-950 text-rose-400 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-rose-800">
+                            <Flame size={10} /> Trending
+                          </span>
+                        )}
+                        {p.isNewArrival !== false && (
+                          <span className="px-2 py-0.5 bg-blue-950 text-blue-400 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-blue-800">
+                            <Sparkles size={10} /> New Arrival
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     <td className="p-4">
@@ -235,8 +246,8 @@ export default function AdminProductsPage() {
                     </td>
 
                     <td className="p-4">
-                      <span className={`font-bold ${p.stock > 10 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                        {p.stock} units
+                      <span className={`font-bold ${p.stock > 10 ? 'text-emerald-400' : p.stock > 0 ? 'text-amber-400' : 'text-rose-400 font-black'}`}>
+                        {p.stock > 0 ? `${p.stock} units` : 'OUT OF STOCK'}
                       </span>
                     </td>
 
@@ -312,9 +323,9 @@ export default function AdminProductsPage() {
                 />
               </div>
 
-              {/* Category Dropdown (SYSTEM DEFAULT CATEGORIES ONLY) */}
+              {/* Category Dropdown */}
               <div>
-                <label className="block text-slate-300 font-bold mb-1.5">Default Category (Dropdown Only) *</label>
+                <label className="block text-slate-300 font-bold mb-1.5">Category *</label>
                 <select
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
@@ -324,7 +335,33 @@ export default function AdminProductsPage() {
                     <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
                 </select>
-                <p className="text-[11px] text-slate-500 mt-1">Select one of the 10 immutable system categories.</p>
+              </div>
+
+              {/* Badges Toggle: New Arrival & Trending */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isNewArrival}
+                    onChange={(e) => setIsNewArrival(e.target.checked)}
+                    className="w-4 h-4 text-emerald-500 rounded"
+                  />
+                  <span className="font-extrabold text-white flex items-center gap-1">
+                    <Sparkles size={14} className="text-blue-400" /> Mark as New Arrival
+                  </span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isTrending}
+                    onChange={(e) => setIsTrending(e.target.checked)}
+                    className="w-4 h-4 text-emerald-500 rounded"
+                  />
+                  <span className="font-extrabold text-white flex items-center gap-1">
+                    <Flame size={14} className="text-rose-400" /> Mark as Trending
+                  </span>
+                </label>
               </div>
 
               {/* Search Tags */}
@@ -340,7 +377,6 @@ export default function AdminProductsPage() {
                   onChange={(e) => setTags(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">Tags enable instant search matches. Tags will NEVER create category cards.</p>
               </div>
 
               {/* Price & Offer Price & Stock */}
