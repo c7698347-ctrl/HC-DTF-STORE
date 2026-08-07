@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Mic, Sparkles, Flame, ArrowRight } from 'lucide-react';
+import { Search, Mic, Sparkles, Flame, ArrowRight, Clock, Trash2, X, TrendingUp } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
 const PLACEHOLDERS = [
@@ -10,7 +10,19 @@ const PLACEHOLDERS = [
   'Search Blouse Designs...',
   'Search Festival Stickers...',
   'Search Metallic DTF...',
-  'Search Custom Prints...'
+  'Search Custom Gang Sheets...',
+  'Search Heat Press Machines...'
+];
+
+const TRENDING_SEARCH_KEYWORDS = [
+  'Festival Collection',
+  'Saree Borders',
+  'Blouse Designs',
+  'Neck Designs',
+  'Metallic Prints',
+  'Kids Collection',
+  'Custom Gang Sheets',
+  'Heat Press Machines'
 ];
 
 export default function AnimatedSearchBar() {
@@ -23,12 +35,59 @@ export default function AnimatedSearchBar() {
 
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [recentSearches, setRecentSearches] = useState([]);
   const [isFocused, setIsFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
 
   const containerRef = useRef(null);
 
-  // Rotating typing placeholder effect starting after mount
+  // Load recent searches from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('hc_recent_searches');
+      if (saved) {
+        setRecentSearches(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  // Save search query to history
+  const saveSearchToHistory = (term) => {
+    if (!term || !term.trim()) return;
+    const cleanTerm = term.trim();
+    const updated = [cleanTerm, ...recentSearches.filter((s) => s.toLowerCase() !== cleanTerm.toLowerCase())].slice(0, 10);
+    setRecentSearches(updated);
+    try {
+      localStorage.setItem('hc_recent_searches', JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteHistoryItem = (e, itemToDelete) => {
+    e.stopPropagation();
+    const updated = recentSearches.filter((item) => item !== itemToDelete);
+    setRecentSearches(updated);
+    try {
+      localStorage.setItem('hc_recent_searches', JSON.stringify(updated));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const clearAllHistory = (e) => {
+    e.stopPropagation();
+    setRecentSearches([]);
+    try {
+      localStorage.removeItem('hc_recent_searches');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Rotating typing placeholder effect
   useEffect(() => {
     let timeout;
     const currentTargetText = PLACEHOLDERS[placeholderIndex];
@@ -101,6 +160,7 @@ export default function AnimatedSearchBar() {
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
       setQuery(transcript);
+      saveSearchToHistory(transcript);
       router.push(`/shop?search=${encodeURIComponent(transcript)}`);
     };
 
@@ -110,9 +170,17 @@ export default function AnimatedSearchBar() {
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (query.trim()) {
+      saveSearchToHistory(query.trim());
       router.push(`/shop?search=${encodeURIComponent(query.trim())}`);
       setIsFocused(false);
     }
+  };
+
+  const executeKeywordSearch = (keyword) => {
+    saveSearchToHistory(keyword);
+    setQuery(keyword);
+    router.push(`/shop?search=${encodeURIComponent(keyword)}`);
+    setIsFocused(false);
   };
 
   return (
@@ -166,39 +234,100 @@ export default function AnimatedSearchBar() {
         </div>
       </form>
 
-      {/* Live Auto-Suggestions Dropdown */}
-      {isFocused && searchResults.length > 0 && (
-        <div className="absolute top-full left-4 right-4 mt-2 bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden z-50 divide-y divide-slate-100">
-          {searchResults.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => {
-                router.push(`/product/${item.slug || item.id}`);
-                setIsFocused(false);
-              }}
-              className="w-full p-3.5 flex items-center gap-3 hover:bg-emerald-50/60 text-left transition"
-            >
-              <img
-                src={item.images?.[0]}
-                alt={item.name}
-                className="w-12 h-12 object-cover rounded-xl shrink-0 border border-slate-200"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-slate-900 truncate">{item.name}</p>
-                <p className="text-[11px] text-slate-500 font-medium">{item.category} • ₹{item.offerPrice || item.price}</p>
-              </div>
-            </button>
-          ))}
+      {/* DROPDOWN MENU: HISTORY, TRENDING & LIVE SUGGESTIONS */}
+      {isFocused && (
+        <div className="absolute top-full left-4 right-4 mt-2 bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden z-50 p-4 space-y-4">
           
-          <button
-            onClick={() => {
-              router.push(`/shop?search=${encodeURIComponent(query)}`);
-              setIsFocused(false);
-            }}
-            className="w-full text-center text-xs font-bold text-emerald-700 py-3 bg-emerald-50 hover:bg-emerald-100 transition"
-          >
-            View all search results →
-          </button>
+          {/* 1. Live Auto-Suggestions while typing */}
+          {query.trim().length > 1 && searchResults.length > 0 && (
+            <div className="space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
+                ⚡ Instant Live Suggestions
+              </span>
+              <div className="divide-y divide-slate-100">
+                {searchResults.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      saveSearchToHistory(item.name);
+                      router.push(`/product/${item.slug || item.id}`);
+                      setIsFocused(false);
+                    }}
+                    className="w-full p-2.5 flex items-center gap-3 hover:bg-emerald-50/60 rounded-2xl text-left transition"
+                  >
+                    <img
+                      src={item.images?.[0]}
+                      alt={item.name}
+                      className="w-10 h-10 object-cover rounded-xl shrink-0 border border-slate-200"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-slate-900 truncate">{item.name}</p>
+                      <p className="text-[11px] text-slate-500 font-medium">{item.category} • ₹{item.offerPrice || item.price}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 2. Recent Search History (When query is empty or short) */}
+          {recentSearches.length > 0 && query.trim().length <= 1 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                  <Clock size={14} className="text-emerald-600" /> 🕒 Recent Searches
+                </span>
+                <button
+                  type="button"
+                  onClick={clearAllHistory}
+                  className="text-[10px] text-rose-600 hover:underline font-bold"
+                >
+                  Clear History
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {recentSearches.map((term, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => executeKeywordSearch(term)}
+                    className="group inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 text-xs font-bold cursor-pointer transition"
+                  >
+                    <span>{term}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => deleteHistoryItem(e, term)}
+                      className="p-0.5 rounded-full hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition"
+                      title="Remove"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 3. Trending Searches */}
+          <div className="space-y-2 pt-1 border-t border-slate-100">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5 px-1">
+              <Flame size={14} className="text-rose-500" /> 🔥 Trending Searches
+            </span>
+
+            <div className="flex flex-wrap gap-2">
+              {TRENDING_SEARCH_KEYWORDS.map((kw, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => executeKeywordSearch(kw)}
+                  className="px-3 py-1.5 rounded-full bg-slate-50 hover:bg-emerald-600 hover:text-white border border-slate-200/90 text-slate-700 text-xs font-extrabold transition shadow-xs"
+                >
+                  {kw}
+                </button>
+              ))}
+            </div>
+          </div>
+
         </div>
       )}
 
