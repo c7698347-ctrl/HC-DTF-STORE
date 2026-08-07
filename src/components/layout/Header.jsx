@@ -36,7 +36,8 @@ export default function Header() {
     currentUser, 
     logoutCustomer,
     setIsCartOpen,
-    setIsAuthModalOpen 
+    setIsAuthModalOpen,
+    settings 
   } = useStore();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -104,7 +105,7 @@ export default function Header() {
               <span>Same Day Dispatch</span>
             </div>
             <span className="text-emerald-700">|</span>
-            <span>Support: +91 98765 43210</span>
+            <span>Support: {settings?.phone || '+91 8121635407'}</span>
           </div>
         </div>
       </div>

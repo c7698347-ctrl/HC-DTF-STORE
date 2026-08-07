@@ -91,7 +91,7 @@ export default function CheckoutPage() {
   };
 
   const handleCopyUpi = () => {
-    const upiStr = settings.upiId || 'hcdtfstore@upi';
+    const upiStr = settings.upiId || 'sunillankapalli77@okhdfcbank';
     navigator.clipboard.writeText(upiStr);
     setCopiedUpi(true);
     setTimeout(() => setCopiedUpi(false), 2000);
@@ -602,7 +602,7 @@ export default function CheckoutPage() {
         {step === 2 && (
           <form onSubmit={handleFinalOrderSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
-            {/* Left Column: Official Store UPI Details & QR Code */}
+            {/* Left Column: Official Store UPI Details & Real Google Pay QR Code */}
             <div className="lg:col-span-6 space-y-6">
               
               <div className="bg-slate-900 text-white p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-2xl space-y-6">
@@ -624,18 +624,18 @@ export default function CheckoutPage() {
                   
                   <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                     <span className="text-slate-400 font-bold">Account Name:</span>
-                    <strong className="text-white font-extrabold">{settings.upiAccountName || 'HC DTF STORE (Hima Bindu)'}</strong>
+                    <strong className="text-white font-extrabold text-sm">{settings.upiAccountName || 'Sunil Kumar'}</strong>
                   </div>
 
                   <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                    <span className="text-slate-400 font-bold">Mobile Number:</span>
-                    <strong className="text-white font-mono font-bold">{settings.upiMobile || '+91 98765 43210'}</strong>
+                    <span className="text-slate-400 font-bold">Contact Number:</span>
+                    <strong className="text-white font-mono font-bold text-sm">{settings.upiMobile || '+91 8121635407'}</strong>
                   </div>
 
                   <div className="flex justify-between items-center">
                     <span className="text-slate-400 font-bold">Official UPI ID:</span>
                     <div className="flex items-center gap-2">
-                      <strong className="text-emerald-400 font-mono font-black text-sm">{settings.upiId || 'hcdtfstore@upi'}</strong>
+                      <strong className="text-emerald-400 font-mono font-black text-sm">{settings.upiId || 'sunillankapalli77@okhdfcbank'}</strong>
                       <button
                         type="button"
                         onClick={handleCopyUpi}
@@ -649,28 +649,33 @@ export default function CheckoutPage() {
 
                 </div>
 
-                {/* QR Code Card */}
-                <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 text-center space-y-3">
-                  <p className="text-xs font-extrabold text-white">Scan & Pay via PhonePe, Google Pay, Paytm, or BHIM</p>
+                {/* Official Google Pay QR Code Display */}
+                <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 text-center space-y-4">
+                  <p className="text-xs font-extrabold text-white">Scan & Pay via Google Pay, PhonePe, Paytm, or BHIM</p>
                   
-                  <div className="bg-white p-3 rounded-2xl inline-block shadow-xl">
+                  <div className="bg-white p-3 rounded-2xl inline-block shadow-2xl border border-slate-200">
                     <img
-                      src={settings.upiQrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi%3A%2F%2Fpay%3Fpa%3D${encodeURIComponent(settings.upiId || 'hcdtfstore@upi')}%26pn%3DHC%2520DTF%2520STORE%26am%3D${grandTotal}%26cu%3DINR`}
-                      alt="UPI QR Code"
-                      className="w-48 h-48 mx-auto rounded-xl object-contain"
+                      src={settings.upiQrCodeUrl || '/gpay-qr.png'}
+                      alt="Official Google Pay QR Code - Sunil Kumar"
+                      className="w-64 sm:w-72 h-auto max-w-full mx-auto rounded-xl object-contain shadow-md"
                     />
                   </div>
 
-                  <p className="text-sm font-black text-emerald-400">
-                    Exact Amount to Pay: ₹{grandTotal.toLocaleString()}
-                  </p>
+                  <div className="pt-1 space-y-1">
+                    <p className="text-base font-black text-emerald-400">
+                      Amount Payable: ₹{grandTotal.toLocaleString()}
+                    </p>
+                    <p className="text-[11px] text-slate-400 font-medium">
+                      UPI ID: <span className="font-mono text-slate-200">{settings.upiId || 'sunillankapalli77@okhdfcbank'}</span>
+                    </p>
+                  </div>
                 </div>
 
               </div>
 
             </div>
 
-            {/* Right Column: Required Verification Proof Form (UTR & Screenshot) */}
+            {/* Right Column: Required Verification Proof Form */}
             <div className="lg:col-span-6 space-y-6">
               
               <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-5">
@@ -682,7 +687,7 @@ export default function CheckoutPage() {
                   </p>
                 </div>
 
-                {/* 1. UPI Transaction ID / UTR Number (REQUIRED) */}
+                {/* 1. UPI Transaction ID / UTR Number */}
                 <div>
                   <label className="block text-xs font-extrabold text-slate-900 mb-1.5">
                     UPI Transaction ID / 12-Digit UTR Number *
@@ -690,7 +695,7 @@ export default function CheckoutPage() {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. 421589012345 (Found in PhonePe / GPay / Paytm receipt)"
+                    placeholder="e.g. 421589012345 (Found in GPay / PhonePe receipt)"
                     value={transactionId}
                     onChange={(e) => setTransactionId(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-3.5 text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-emerald-500"
@@ -698,7 +703,7 @@ export default function CheckoutPage() {
                   <p className="text-[11px] text-slate-400 mt-1">Transaction ID is required to match bank credits.</p>
                 </div>
 
-                {/* 2. Payment Screenshot Upload (REQUIRED) */}
+                {/* 2. Payment Screenshot Upload */}
                 <div>
                   <label className="block text-xs font-extrabold text-slate-900 mb-1.5">
                     Payment Screenshot Receipt *
@@ -763,7 +768,7 @@ export default function CheckoutPage() {
                 </button>
 
                 <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-[11px] text-amber-800 font-medium leading-relaxed">
-                  <strong>Verification Note:</strong> Your order will be set to <em>Payment Verification Pending</em>. Our accounts team will verify your UTR in our bank ledger and confirm your order.
+                  <strong>Verification Note:</strong> Your order will be set to <em>Payment Verification Pending</em>. Account details belong to <strong>Sunil Kumar</strong>. Our team will verify your UTR and confirm your order.
                 </div>
 
               </div>
