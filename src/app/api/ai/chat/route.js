@@ -1,57 +1,44 @@
 import { NextResponse } from 'next/server';
 
 /**
- * HISUHI AI - Official AI Assistant Engine for HC DTF STORE
- * Fully implements HISUHI AI MASTER SYSTEM PROMPT
+ * HISUHI AI - Official Smart AI Ecommerce Assistant Engine for HC DTF STORE
+ * Implements HISUHI AI Master Sales & Shopping Prompt
  */
 
-const INITIAL_WELCOME_TEXT = `👋 Welcome to HC DTF STORE!
+const FIRST_WELCOME_TEXT = `👋 Welcome to HC DTF STORE.
 
-I'm 🤖 HISUHI AI, your smart shopping assistant.
+Please choose your preferred language.
 
-🌍 I can help you in your preferred language.
-
-Please choose a language or simply start typing.
-
-1️⃣ English 🇬🇧
-2️⃣ తెలుగు 🇮🇳
-3️⃣ हिन्दी 🇮🇳
-4️⃣ ಕನ್ನಡ 🇮🇳
-5️⃣ தமிழ் 🇮🇳
-6️⃣ മലയാളം 🇮🇳
-7️⃣ বাংলা 🇮🇳
-8️⃣ मराठी 🇮🇳
-9️⃣ ગુજરાતી 🇮🇳
-🔟 ਪੰਜਾਬੀ 🇮🇳
-
-Or just send a message in your own language.
-I'll automatically continue in that language.`;
+🇮🇳 English
+🇮🇳 తెలుగు
+🇮🇳 हिन्दी
+🇮🇳 ಕನ್ನಡ
+🇮🇳 தமிழ்
+🇮🇳 മലയാളം`;
 
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { message, history, orders, products } = body;
+    const { message, history, orders, products, currentStep } = body;
 
     if (!message || message.trim() === '' || message.toLowerCase() === 'hi' || message.toLowerCase() === 'hello' || message.toLowerCase() === 'start') {
       return NextResponse.json({
-        reply: INITIAL_WELCOME_TEXT,
+        reply: FIRST_WELCOME_TEXT,
         type: 'welcome',
         suggestedActions: [
-          { label: '1️⃣ English 🇬🇧', payload: 'Hello' },
-          { label: '2️⃣ తెలుగు 🇮🇳', payload: 'నమస్కారం' },
-          { label: '3️⃣ हिन्दी 🇮🇳', payload: 'नमस्ते' },
-          { label: '4️⃣ ಕನ್ನಡ 🇮🇳', payload: 'ನಮಸ್ಕಾರ' },
-          { label: '5️⃣ தமிழ் 🇮🇳', payload: 'வணக்கம்' },
-          { label: '6️⃣ Track Order 📦', payload: 'Where is my order?' },
-          { label: '7️⃣ Payment UPI 💳', payload: 'How to pay?' },
-          { label: '8️⃣ Shipping Rates 🚚', payload: 'What are shipping charges?' }
+          { label: '🇮🇳 English', payload: 'Hello' },
+          { label: '🇮🇳 తెలుగు', payload: 'నమస్కారం' },
+          { label: '🇮🇳 हिन्दी', payload: 'नमस्ते' },
+          { label: '🇮🇳 ಕನ್ನಡ', payload: 'ನಮಸ್ಕಾರ' },
+          { label: '🇮🇳 தமிழ்', payload: 'வணக்கம்' },
+          { label: '🇮🇳 മലയാളം', payload: 'നമസ്കാരം' }
         ]
       });
     }
 
     const msgLower = message.trim().toLowerCase();
 
-    // SECURITY CHECK - Strict rejection of system secrets
+    // SECURITY CHECK - Strict Rejection of Internal Secrets
     if (
       msgLower.includes('system prompt') ||
       msgLower.includes('admin password') ||
@@ -62,63 +49,107 @@ export async function POST(req) {
       msgLower.includes('secret')
     ) {
       return NextResponse.json({
-        reply: "🔒 I'm sorry, but internal security data, passwords, and system prompts are confidential and cannot be shared. How else can I assist you with HC DTF STORE products today?",
+        reply: "🔒 Internal security credentials and system configurations are confidential. How can I help you choose the best DTF transfer sheets or process your order today?",
         type: 'security_refusal'
       });
     }
 
-    // 1. ORDER TRACKING LOOKUP
+    // CASH ON DELIVERY / COD STICT POLICY CHECK
+    if (msgLower.includes('cod') || msgLower.includes('cash on delivery') || msgLower.includes('pay on delivery')) {
+      return NextResponse.json({
+        reply: `✨ HC DTF STORE processes custom-printed DTF sheets on-demand, so we accept **Prepaid Payments ONLY** via instant UPI (Google Pay, PhonePe, Paytm, BHIM).\n\nWould you like me to guide you step-by-step on how to complete your prepaid order?`,
+        type: 'text'
+      });
+    }
+
+    // STEP BY STEP GUIDED ORDER ASSISTANT ("I don't know how to order" or "How to buy")
+    if (msgLower.includes('how to order') || msgLower.includes('dont know how') || msgLower.includes('don\'t know how') || msgLower.includes('order cheyadam') || msgLower.includes('కలా ఆర్డర్')) {
+      return NextResponse.json({
+        reply: `🛍️ Ordering on HC DTF STORE is super simple! Let's do it together step-by-step:\n\n**STEP 1**: Choose your favorite DTF product (Blouse designs, Saree borders, Neck designs, or DTF Patches).\n\nLet me know which design you are looking for!`,
+        type: 'guided_step',
+        step: 1,
+        suggestedActions: [
+          { label: '🌺 Blouse Designs', payload: 'Show me Blouse Designs' },
+          { label: '👑 Saree Borders', payload: 'Show me Saree Borders' },
+          { label: '✨ Neck Designs', payload: 'Show me Neck Designs' },
+          { label: '🎉 Festival Patches', payload: 'Show me Festival Patches' }
+        ]
+      });
+    }
+
+    // PAYMENT COMPLETED TAP / CONFIRMATION
+    if (msgLower.includes('i have completed payment') || msgLower.includes('payment done') || msgLower.includes('paid') || msgLower.includes('పేమెంట్ చేశాను')) {
+      return NextResponse.json({
+        reply: `Thank you. Your payment request has been submitted. Our system is verifying your payment. You will receive confirmation shortly.`,
+        type: 'payment_confirmed'
+      });
+    }
+
+    // PAYMENT HELP (PREPAID ONLY - NO SCREENSHOT REQUIRED)
+    if (msgLower.includes('payment') || msgLower.includes('pay') || msgLower.includes('upi') || msgLower.includes('qr') || msgLower.includes('gpay') || msgLower.includes('phonepe')) {
+      return NextResponse.json({
+        reply: `💳 **HC DTF STORE Prepaid Payment Details**:
+
+• **Official UPI ID**: \`sunillankapalli77@okhdfcbank\`
+• **Account Name**: Sunil Kumar
+• **Payment Contact**: +91 8121635407
+
+**Simple Payment Process**:
+1. Scan QR code or tap the prefilled GPay / PhonePe payment link.
+2. Complete payment in your UPI app.
+3. Tap **"I HAVE COMPLETED PAYMENT"** on checkout.
+
+*No payment screenshot is required! Our automated system matches your bank credit.*`,
+        type: 'payment_info'
+      });
+    }
+
+    // ORDER TRACKING LOOKUP (Stages: Payment Pending -> Payment Verified -> Printing -> Packing -> Shipped -> Delivered)
     const orderIdMatch = message.match(/HC-ORD-\d{4}/i) || message.match(/ORD-\d{4}/i);
-    if (orderIdMatch || msgLower.includes('track') || msgLower.includes('where is my order') || msgLower.includes('order status') || msgLower.includes('నా ఆర్డర్')) {
+    if (orderIdMatch || msgLower.includes('track') || msgLower.includes('where is my order') || msgLower.includes('status')) {
       const targetId = orderIdMatch ? orderIdMatch[0].toUpperCase() : null;
-      
+
       if (targetId && Array.isArray(orders)) {
         const found = orders.find(o => o.id?.toUpperCase() === targetId || o.trackingNumber?.toUpperCase() === targetId);
         if (found) {
+          const mappedStage = found.status.includes('Pending') ? 'Payment Pending' 
+            : found.status.includes('Verified') ? 'Payment Verified'
+            : found.status.includes('Printing') ? 'Printing'
+            : found.status.includes('Packed') ? 'Packing'
+            : found.status.includes('Shipped') ? 'Shipped'
+            : 'Delivered';
+
           return NextResponse.json({
-            reply: `📦 **Order Status for #${found.id}**:\n\n• **Customer**: ${found.customerName}\n• **Status**: ${found.status}\n• **Payment**: ${found.paymentStatus}\n• **Courier**: ${found.courierName || 'Delhivery / Blue Dart (Processing)'}\n• **Tracking AWB**: ${found.trackingNumber || 'Assigned after packing'}\n\nYou can track 9-stage live factory progress on our Track Order page!`,
+            reply: `📦 **Order Status for #${found.id}**:
+
+• **Current Stage**: ${mappedStage}
+• **Customer**: ${found.customerName}
+• **Total Amount**: ₹${found.total}
+• **Tracking AWB**: ${found.trackingNumber || 'Assigned after packing'}
+
+Stage Pipeline: Payment Pending ➔ Payment Verified ➔ Printing ➔ Packing ➔ Shipped ➔ Delivered`,
             type: 'order_status',
             order: found
           });
         } else {
           return NextResponse.json({
-            reply: `🔍 I searched our database for Order ID **${targetId}**, but couldn't find it. Please double check your order number or contact our WhatsApp helpline (+91 7207528651).`,
-            type: 'text'
+            reply: `🔍 I could not find Order ID **${targetId}** in our live system. Please verify your order number or tap below to connect with WhatsApp support.`,
+            type: 'text',
+            showWhatsApp: true
           });
         }
       }
 
       return NextResponse.json({
-        reply: "📦 I'd be happy to track your order! Please reply with your **Order ID** (e.g. `HC-ORD-1049`).",
+        reply: "📦 Please share your **Order ID** (e.g. `HC-ORD-1049`) and I will check your tracking status immediately!",
         type: 'text'
       });
     }
 
-    // 2. PAYMENT HELP
-    if (msgLower.includes('payment') || msgLower.includes('pay') || msgLower.includes('upi') || msgLower.includes('qr') || msgLower.includes('gpay') || msgLower.includes('phonepe') || msgLower.includes('రూపాయలు') || msgLower.includes('ప్రాసెస్')) {
+    // SHIPPING RATES
+    if (msgLower.includes('ship') || msgLower.includes('delivery') || msgLower.includes('courier') || msgLower.includes('charge') || msgLower.includes('rate')) {
       return NextResponse.json({
-        reply: `💳 **HC DTF STORE Official Payment Process**:
-
-1️⃣ **Official UPI ID**: \`sunillankapalli77@okhdfcbank\`
-2️⃣ **Official Account Name**: Sunil Kumar
-3️⃣ **Payment Contact**: +91 8121635407
-4️⃣ **Support WhatsApp**: +91 7207528651
-
-**5-Step Payment Steps**:
-1. Scan QR Code or tap direct GPay / PhonePe / Paytm link on Checkout.
-2. Complete Payment (The exact amount is prefilled automatically).
-3. Take a screenshot of the payment receipt.
-4. Enter 12-Digit UTR Transaction ID & upload screenshot.
-5. Our bank team verifies your UTR & starts printing!`,
-        type: 'payment_help',
-        showWhatsApp: true
-      });
-    }
-
-    // 3. SHIPPING RATES
-    if (msgLower.includes('ship') || msgLower.includes('delivery') || msgLower.includes('courier') || msgLower.includes('charge') || msgLower.includes('డెలివరీ') || msgLower.includes('ఛార్జ్')) {
-      return NextResponse.json({
-        reply: `🚚 **HC DTF STORE State-Wise Shipping Charges**:
+        reply: `🚚 **HC DTF STORE State Delivery Rates**:
 
 • **Andhra Pradesh**: ₹150
 • **Telangana**: ₹150
@@ -127,31 +158,15 @@ export async function POST(req) {
 • **Kerala**: ₹200
 • **Other States**: ₹200
 
-✨ **FREE Delivery** on orders above ₹999!
-Orders are dispatched same-day in protective roll cylinder boxes.`,
+✨ **FREE Delivery** on orders above ₹999!`,
         type: 'shipping_info'
       });
     }
 
-    // 4. PRINTING GUIDE & HEAT PRESS INSTRUCTIONS
-    if (msgLower.includes('press') || msgLower.includes('heat') || msgLower.includes('temperature') || msgLower.includes('iron') || msgLower.includes('peel') || msgLower.includes('fabric')) {
+    // HUMAN WHATSAPP SUPPORT
+    if (msgLower.includes('support') || msgLower.includes('human') || msgLower.includes('agent') || msgLower.includes('whatsapp') || msgLower.includes('help')) {
       return NextResponse.json({
-        reply: `🔥 **HC DTF Store Printing & Heat Press Guide**:
-
-• **Temperature**: 160°C (320°F)
-• **Press Time**: 15 Seconds
-• **Pressure**: Medium-High (4-5 bar)
-• **Peel Type**: Cold Peel / Hot Peel (Allow 10 sec to cool for optimum durability)
-• **Second Press**: 5 seconds with Teflon sheet for matte wash-resistant finish.
-• **Durability**: 50+ commercial machine washes!`,
-        type: 'printing_guide'
-      });
-    }
-
-    // 5. HUMAN / WHATSAPP SUPPORT
-    if (msgLower.includes('support') || msgLower.includes('human') || msgLower.includes('agent') || msgLower.includes('whatsapp') || msgLower.includes('contact') || msgLower.includes('call') || msgLower.includes('మనుషులు')) {
-      return NextResponse.json({
-        reply: "I'll connect you directly with our HC DTF STORE human support team on WhatsApp right away! 👋",
+        reply: "I'll connect you directly with our HC DTF STORE support team on WhatsApp right now!",
         type: 'whatsapp_redirect',
         showWhatsApp: true,
         whatsappNumber: '7207528651',
@@ -159,7 +174,7 @@ Orders are dispatched same-day in protective roll cylinder boxes.`,
       });
     }
 
-    // 6. PRODUCT SEARCH ENGINE
+    // SEARCH & RECOMMEND PRODUCTS
     let matchedProducts = [];
     if (Array.isArray(products) && products.length > 0) {
       matchedProducts = products.filter(p => {
@@ -177,99 +192,94 @@ Orders are dispatched same-day in protective roll cylinder boxes.`,
 
     if (matchedProducts.length > 0) {
       return NextResponse.json({
-        reply: `✨ Here are top recommended products matching "**${message}**" from our store:`,
+        reply: `✨ Here are top recommendations for "**${message}**":`,
         type: 'product_recommendation',
         products: matchedProducts
       });
     }
 
-    // 7. MULTILINGUAL INTELLIGENT BOT RESPONDER
-    // Detect Language Type
-    const isTelugu = /[\u0C00-\u0C7F]/.test(message) || msgLower.includes('namaskaram') || msgLower.includes('ela unnav') || msgLower.includes('cheppu');
-    const isHindi = /[\u0900-\u097F]/.test(message) || msgLower.includes('namaste') || msgLower.includes('kya') || msgLower.includes('hai');
+    // MULTILINGUAL NATURAL RESPONDER
+    const isTelugu = /[\u0C00-\u0C7F]/.test(message) || msgLower.includes('namaskaram') || msgLower.includes('ela') || msgLower.includes('cheppu');
+    const isHindi = /[\u0900-\u097F]/.test(message) || msgLower.includes('namaste') || msgLower.includes('kya') || msgLower.includes('batao');
     const isTamil = /[\u0B80-\u0BFF]/.test(message) || msgLower.includes('vanakkam');
     const isKannada = /[\u0C80-\u0CFF]/.test(message) || msgLower.includes('namaskara');
     const isMalayalam = /[\u0D00-\u0D7F]/.test(message);
 
     if (isTelugu) {
       return NextResponse.json({
-        reply: `నమస్కారం! 🙏 నేను **HISUHI AI**, HC DTF STORE యొక్క అధికారిక AI అసిస్టెంట్‌ని.
+        reply: `నమస్కారం! 🙏 నేను **HISUHI AI**, HC DTF STORE స్మార్ట్ షాపింగ్ అసిస్టెంట్‌ని.
 
-నేను మీకు ఎలా సహాయపడగలను?
-1️⃣ **DTF ప్రింట్లు & డిజైన్లు చూడటానికి**
-2️⃣ **ఆర్డర్ ట్రాక్ చేయడానికి** (మీ Order ID పంపండి)
-3️⃣ **పేమెంట్ వివరాలు & UPI QR పొందేందుకు**
-4️⃣ **షిప్పింగ్ ఛార్జీలు తెలుసుకోవడానికి**
+ఆర్డర్ చేయడం చాలా సులభం:
+1️⃣ మీకు కావాల్సిన DTF డిజైన్ ఎంచుకోండి
+2️⃣ కార్ట్‌కి యాడ్ చేయండి
+3️⃣ మీ డెలివరీ అడ్రస్ టైప్ చేయండి
+4️⃣ ప్రిపేడ్ UPI ద్వారా పేమెంట్ పూర్తి చేయండి
 
-దయచేసి మీ ప్రశ్నను టైప్ చేయండి!`,
+మీకు ఏ డిజైన్ కావాలో చెప్పండి!`,
         type: 'text'
       });
     }
 
     if (isHindi) {
       return NextResponse.json({
-        reply: `नमस्ते! 🙏 मैं **HISUHI AI**, HC DTF STORE का आधिकारिक स्मार्ट AI असिस्टेंट हूँ।
+        reply: `नमस्ते! 🙏 मैं **HISUHI AI**, HC DTF STORE का स्मार्ट AI शॉपिंग असिस्टेंट हूँ।
 
-मैं आपकी किस प्रकार सहायता कर सकता हूँ?
-1️⃣ **DTF प्रिंट्स और डिज़ाइन्स देखने के लिए**
-2️⃣ **ऑर्डर ट्रैक करने के लिए** (अपना Order ID भेजें)
-3️⃣ **UPI भुगतान और QR कोड सहायता**
-4️⃣ **शिपिंग और डिलीवरी शुल्क**
+आर्डर करना बेहद आसान है:
+1️⃣ अपना मनपसंद DTF डिज़ाइन चुनें
+2️⃣ कार्ट में जोड़ें
+3️⃣ डिलीवरी पता दर्ज करें
+4️⃣ UPI द्वारा प्रीपेड भुगतान पूरा करें
 
-कृपया अपना प्रश्न पूछें!`,
+आपको कौन सा डिज़ाइन देखना है?`,
         type: 'text'
       });
     }
 
     if (isKannada) {
       return NextResponse.json({
-        reply: `ನಮಸ್ಕಾರ! 🙏 ನಾನು **HISUHI AI**, HC DTF STORE ನ ಅಧಿಕೃತ AI ಸಹಾಯಕಿ.
+        reply: `ನಮಸ್ಕಾರ! 🙏 ನಾನು **HISUHI AI**, HC DTF STORE ನ AI ಶಾಪಿಂಗ್ ಸಹಾಯಕಿ.
 
-ನಾನು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಲಿ?
-1️⃣ **DTF ಪ್ರಿಂಟ್‌ಗಳು ಮತ್ತು ಡಿಸೈನ್‌ಗಳನ್ನು ವೀಕ್ಷಿಸಲು**
-2️⃣ **ಆರ್ಡರ್ ಟ್ರ್ಯಾಕ್ ಮಾಡಲು** (ನಿಮ್ಮ Order ID ಕಳುಹಿಸಿ)
-3️⃣ **UPI ಪಾವತಿ ಮತ್ತು QR ಸಹಾಯ**
-4️⃣ **ಶಿಪ್ಪಿಂಗ್ ಶುಲ್ಕಗಳು**
+ಆರ್ಡರ್ ಮಾಡಲು ಸಹಾಯ ಬೇಕೇ?
+1️⃣ ನಿಮ್ಮ ಮೆಚ್ಚಿನ DTF ಡಿಸೈನ್ ಆಯ್ಕೆಮಾಡಿ
+2️⃣ ವಿಳಾಸ ನಮೂದಿಸಿ
+3️⃣ UPI ಮೂಲಕ ಪಾವತಿಸಿ
 
-ದಯವಿಟ್ಟು ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ಕೇಳಿ!`,
+ನಿಮಗೆ ಯಾವ ಡಿಸೈನ್ ಬೇಕು ಹೇಳಿ!`,
         type: 'text'
       });
     }
 
     if (isTamil) {
       return NextResponse.json({
-        reply: `வணக்கம்! 🙏 நான் **HISUHI AI**, HC DTF STORE இன் அதிகாரப்பூர்வ AI உதவி.
+        reply: `வணக்கம்! 🙏 நான் **HISUHI AI**, HC DTF STORE இன் AI ஷாப்பிங் உதவி.
 
-நான் உங்களுக்கு எவ்வாறு உதவ முடியும்?
-1️⃣ **DTF பிரிண்ட்கள் & டிசைன்கள் பார்க்க**
-2️⃣ **ஆர்டர் டிராக்கிங்** (உங்கள் Order ID அனுப்பவும்)
-3️⃣ **UPI பணம் செலுத்துதல் உதவி**
-4️⃣ **ஷிப்பிங் கட்டணங்கள்**
+ஆர்டர் செய்ய உதவட்டுமா?
+1️⃣ உங்கள் விருப்பமான DTF டிசைன் தேர்வு செய்யவும்
+2️⃣ முகவரி உள்ளிடவும்
+3️⃣ UPI மூலம் செலுத்தவும்
 
-தயவுசெய்து உங்கள் கேள்வியை கேட்கவும்!`,
+உங்களுக்கு என்ன டிசைன் வேண்டும் சொல்லுங்கள்!`,
         type: 'text'
       });
     }
 
-    // Default Smart English Assistance
     return NextResponse.json({
-      reply: `I'm **HISUHI AI**, your smart shopping expert at HC DTF STORE! 
+      reply: `I'm **HISUHI AI**, your personal shopping expert at HC DTF STORE!
 
-How can I help you today?
-• 🖼️ **Browse Collections**: Blouse Designs, Saree Borders, Neck Designs, Festival Patches
+How can I help you complete your order today?
+• 🌺 **Browse Top Designs**: Blouse, Saree Borders, Neck designs & Patches
 • 📦 **Track Order**: Send your Order ID (e.g. \`HC-ORD-1049\`)
-• 💳 **Payment Guidance**: Official UPI & QR code instructions
-• 🚚 **Delivery Rates**: State-wise shipping fees & free delivery terms
+• 💳 **Payment**: Prepaid UPI details (\`sunillankapalli77@okhdfcbank\`)
 • 💬 **Human Support**: Connect with our WhatsApp team (+91 7207528651)
 
-Feel free to type your question in any language!`,
+What product are you looking to buy today?`,
       type: 'text'
     });
 
   } catch (error) {
     console.error('HISUHI AI Engine Error:', error);
     return NextResponse.json({
-      reply: "Hello! I'm HISUHI AI. How may I assist your shopping experience at HC DTF STORE today?",
+      reply: "Hello! I'm HISUHI AI. How can I assist you with your HC DTF STORE order today?",
       type: 'text'
     });
   }

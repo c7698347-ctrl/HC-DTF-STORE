@@ -59,8 +59,8 @@ export default function CheckoutPage() {
   // Mandatory No-Returns Agreement
   const [acceptedNoReturnPolicy, setAcceptedNoReturnPolicy] = useState(false);
 
-  // Manual UPI Payment Verification Inputs (STRICTLY REQUIRED)
-  const [step, setStep] = useState(1); // 1 = Address & Policy, 2 = Manual UPI Payment & Verification Proof
+  // Manual Prepaid UPI Payment Verification Inputs
+  const [step, setStep] = useState(1); // 1 = Address & Policy, 2 = Manual UPI Payment & Verification
   const [transactionId, setTransactionId] = useState('');
   const [paymentScreenshot, setPaymentScreenshot] = useState('');
   const [copiedUpi, setCopiedUpi] = useState(false);
@@ -142,7 +142,7 @@ export default function CheckoutPage() {
     setStep(2);
   };
 
-  const generatePDFInvoice = (orderId) => {
+  const generatePDFInvoice = (orderId, utrVal) => {
     const doc = new jsPDF();
     doc.setFontSize(18);
     doc.text('HC DTF STORE - OFFICIAL TAX INVOICE', 14, 20);
@@ -154,7 +154,7 @@ export default function CheckoutPage() {
     doc.text(`Customer Name: ${fullName}`, 14, 52);
     doc.text(`Email / Mobile: ${email} | ${mobile}`, 14, 58);
     doc.text(`Shipping Address: ${houseFlatNo}, ${street}, ${area}, ${city}, ${state} - ${pincode}`, 14, 64);
-    doc.text(`UPI UTR Transaction ID: ${transactionId}`, 14, 70);
+    doc.text(`UPI UTR / Transaction ID: ${utrVal || 'Submitted (Verification Pending)'}`, 14, 70);
 
     let y = 84;
     doc.text('Order Line Items:', 14, y);
@@ -184,16 +184,8 @@ export default function CheckoutPage() {
   };
 
   const handleFinalOrderSubmit = (e) => {
-    e.preventDefault();
-    if (!transactionId.trim()) {
-      alert('Please enter your 12-digit UPI UTR / Transaction ID.');
-      return;
-    }
-    if (!paymentScreenshot) {
-      alert('Please upload your UPI Payment Screenshot receipt before completing order submission.');
-      return;
-    }
-
+    if (e) e.preventDefault();
+    
     setIsSubmittingOrder(true);
 
     if (selectedAddressId === 'new') {
@@ -212,6 +204,8 @@ export default function CheckoutPage() {
       });
     }
 
+    const utrValue = transactionId.trim() || `UPI-TXN-${Date.now().toString().slice(-8)}`;
+
     setTimeout(() => {
       const fullAddressFormatted = `${houseFlatNo}, ${street}, ${area}, ${landmark ? 'Landmark: ' + landmark + ', ' : ''}${city}, ${district}, ${state} - ${pincode}`;
 
@@ -226,16 +220,16 @@ export default function CheckoutPage() {
         gst: gstAmount,
         shipping: shippingFee,
         total: grandTotal,
-        transactionId: transactionId.trim(),
-        paymentScreenshot,
+        transactionId: utrValue,
+        paymentScreenshot: paymentScreenshot || '',
         paymentStatus: 'Verification Pending',
         status: 'Payment Verification Pending'
       });
 
-      generatePDFInvoice(newOrder.id);
+      generatePDFInvoice(newOrder.id, utrValue);
       setIsSubmittingOrder(false);
       setCreatedOrderData(newOrder);
-    }, 1200);
+    }, 1000);
   };
 
   if (cart.length === 0 && !createdOrderData) {
@@ -291,8 +285,8 @@ export default function CheckoutPage() {
       <div className="py-16 bg-slate-50 min-h-screen flex items-center justify-center p-4">
         <div className="bg-white p-8 sm:p-12 rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full text-center space-y-6">
           
-          <div className="w-20 h-20 rounded-full bg-amber-100 border-2 border-amber-400 text-amber-600 flex items-center justify-center mx-auto animate-pulse">
-            <Clock size={40} />
+          <div className="w-20 h-20 rounded-full bg-emerald-100 border-2 border-emerald-400 text-emerald-600 flex items-center justify-center mx-auto animate-bounce">
+            <CheckCircle2 size={44} />
           </div>
 
           <div className="space-y-2">
@@ -302,22 +296,22 @@ export default function CheckoutPage() {
             <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
               Order #{createdOrderData.id} Submitted!
             </h2>
-            <p className="text-xs sm:text-sm text-slate-600 font-bold leading-relaxed pt-2">
-              "Your payment is under verification. We will verify your payment and start processing your order."
+            <p className="text-xs sm:text-sm text-slate-700 font-bold leading-relaxed pt-2">
+              "Thank you. Your payment request has been submitted. Our system is verifying your payment. You will receive confirmation shortly."
             </p>
           </div>
 
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-left text-xs space-y-2">
             <div className="flex justify-between border-b border-slate-200 pb-2">
-              <span className="text-slate-500 font-medium">Grand Total Amount Paid:</span>
+              <span className="text-slate-500 font-medium">Grand Total Amount:</span>
               <strong className="text-slate-900 font-black">₹{createdOrderData.total?.toLocaleString()}</strong>
             </div>
             <div className="flex justify-between border-b border-slate-200 pb-2">
-              <span className="text-slate-500 font-medium">Submitted UTR / Transaction ID:</span>
+              <span className="text-slate-500 font-medium">UTR / Ref Number:</span>
               <strong className="text-emerald-700 font-mono font-bold">{createdOrderData.transactionId}</strong>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500 font-medium">Current Status:</span>
+              <span className="text-slate-500 font-medium">Order Status:</span>
               <strong className="text-amber-600 font-bold">Payment Verification Pending</strong>
             </div>
           </div>
@@ -349,17 +343,17 @@ export default function CheckoutPage() {
         {/* Header & Step Indicator */}
         <div className="border-b border-slate-200 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-black text-slate-900">Manual UPI Express Checkout</h1>
-            <p className="text-xs text-slate-500 mt-1">Direct Factory Order • State-Wise Delivery • 18% GST Invoice</p>
+            <h1 className="text-3xl font-black text-slate-900">Prepaid Express Checkout</h1>
+            <p className="text-xs text-slate-500 mt-1">Direct Factory Order • State-Wise Delivery • Prepaid UPI Payment</p>
           </div>
 
           <div className="flex items-center gap-2 text-xs font-bold">
             <span className={`px-3 py-1.5 rounded-full ${step === 1 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-              1. Address & State Delivery
+              1. Delivery Address
             </span>
             <span className="text-slate-400">→</span>
             <span className={`px-3 py-1.5 rounded-full ${step === 2 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-              2. Auto-Prefilled UPI & Verification
+              2. Complete Prepaid UPI Payment
             </span>
           </div>
         </div>
@@ -520,7 +514,6 @@ export default function CheckoutPage() {
                     />
                   </div>
 
-                  {/* 10. State Selector (Triggers Live Delivery Charge Calculation) */}
                   <div>
                     <label className="block text-slate-700 font-bold mb-1">State (Auto-Calculates Delivery Charge) *</label>
                     <select
@@ -579,7 +572,7 @@ export default function CheckoutPage() {
                     : 'bg-slate-300 text-slate-500 cursor-not-allowed'
                 }`}
               >
-                <span>Proceed to Auto-Prefilled Payment Details</span>
+                <span>Proceed to Complete Payment</span>
                 <ArrowRight size={18} />
               </button>
 
@@ -604,7 +597,6 @@ export default function CheckoutPage() {
                   ))}
                 </div>
 
-                {/* 8. COMPLETE ORDER SUMMARY DISPLAY */}
                 <div className="space-y-2 text-xs border-t border-slate-200 pt-3 text-slate-600">
                   <div className="flex justify-between">
                     <span>Products Subtotal</span>
@@ -639,7 +631,7 @@ export default function CheckoutPage() {
           </form>
         )}
 
-        {/* STEP 2: AUTO-PREFILLED DYNAMIC UPI PAYMENT & VERIFICATION PROOF */}
+        {/* STEP 2: PREPAID DYNAMIC UPI PAYMENT & 1-TAP "I HAVE COMPLETED PAYMENT" */}
         {step === 2 && (
           <form onSubmit={handleFinalOrderSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
@@ -651,9 +643,9 @@ export default function CheckoutPage() {
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                   <div>
                     <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider bg-emerald-950 px-2.5 py-1 rounded border border-emerald-500/30">
-                      Official Account
+                      Prepaid Payment Only
                     </span>
-                    <h3 className="text-xl font-black text-white mt-1">Auto-Prefilled UPI Payment</h3>
+                    <h3 className="text-xl font-black text-white mt-1">Prepaid UPI Express Payment</h3>
                   </div>
                   <button type="button" onClick={() => setStep(1)} className="text-xs text-slate-400 hover:text-white underline">
                     ← Edit Address
@@ -690,13 +682,12 @@ export default function CheckoutPage() {
 
                 </div>
 
-                {/* 4. DYNAMIC PREFILLED AMOUNT UPI QR CODE & DIRECT PAY BUTTON */}
+                {/* DYNAMIC PREFILLED AMOUNT UPI QR CODE & DIRECT PAY BUTTON */}
                 <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 text-center space-y-4">
                   <p className="text-xs font-extrabold text-emerald-400">
                     Scan below or tap button — Amount ₹{grandTotal.toFixed(2)} is automatically prefilled!
                   </p>
 
-                  {/* Dynamic QR Code containing exact amount */}
                   <div className="bg-white p-3 rounded-2xl inline-block shadow-2xl border border-slate-200">
                     <img
                       src={dynamicQrCodeUrl}
@@ -705,7 +696,6 @@ export default function CheckoutPage() {
                     />
                   </div>
 
-                  {/* Direct Launch Button for Mobile UPI Apps */}
                   <div className="pt-2">
                     <a
                       href={upiDeepLinkUri}
@@ -715,9 +705,6 @@ export default function CheckoutPage() {
                       <span>Tap to Pay ₹{grandTotal.toFixed(2)} in Google Pay / PhonePe / Paytm</span>
                       <ExternalLink size={16} />
                     </a>
-                    <p className="text-[11px] text-slate-400 mt-2 font-medium">
-                      No manual amount typing required. The app will open directly with ₹{grandTotal.toFixed(2)}.
-                    </p>
                   </div>
                 </div>
 
@@ -725,100 +712,60 @@ export default function CheckoutPage() {
 
             </div>
 
-            {/* Right Column: Required Verification Proof Form */}
+            {/* Right Column: 1-Tap "I HAVE COMPLETED PAYMENT" Confirmation */}
             <div className="lg:col-span-6 space-y-6">
               
-              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-5">
+              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
                 
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 tracking-tight">Payment Verification Proof</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Enter transaction UTR number & upload payment screenshot to submit order.
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight">Confirm Payment & Submit Order</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Once you complete the UPI payment in Google Pay / PhonePe / Paytm, click below.
                   </p>
                 </div>
 
-                {/* 1. UPI Transaction ID / UTR Number */}
+                {/* 1. UPI Transaction ID / UTR Number (Optional / Quick) */}
                 <div>
                   <label className="block text-xs font-extrabold text-slate-900 mb-1.5">
-                    UPI Transaction ID / 12-Digit UTR Number *
+                    UPI Transaction ID / 12-Digit UTR Number (Optional)
                   </label>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. 421589012345 (Found in GPay / PhonePe receipt)"
                     value={transactionId}
                     onChange={(e) => setTransactionId(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-3.5 text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-emerald-500"
                   />
-                  <p className="text-[11px] text-slate-400 mt-1">Transaction ID is required to match bank credits.</p>
+                  <p className="text-[11px] text-slate-400 mt-1">Optional. Entering your UTR speeds up automatic bank credit verification.</p>
                 </div>
 
-                {/* 2. Payment Screenshot Upload */}
+                {/* Optional Screenshot Upload */}
                 <div>
-                  <label className="block text-xs font-extrabold text-slate-900 mb-1.5">
-                    Payment Screenshot Receipt *
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Upload Payment Screenshot Receipt (Optional)
                   </label>
-
-                  <div className="border-2 border-dashed border-slate-300 rounded-3xl p-6 text-center bg-slate-50 space-y-2">
-                    {paymentScreenshot ? (
-                      <div className="space-y-3">
-                        <img
-                          src={paymentScreenshot}
-                          alt="Payment Screenshot"
-                          className="w-36 h-48 object-cover rounded-2xl mx-auto border-2 border-emerald-500 shadow-md"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setPaymentScreenshot('')}
-                          className="text-xs text-rose-600 font-bold hover:underline"
-                        >
-                          Remove & Upload Different Screenshot
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <Upload size={32} className="mx-auto text-emerald-600" />
-                        <p className="text-xs font-bold text-slate-800">Upload screenshot of completed payment</p>
-                        <p className="text-[11px] text-slate-400">Supports JPG, PNG, WEBP receipts</p>
-                        
-                        <input
-                          type="file"
-                          required
-                          accept="image/*"
-                          onChange={handleScreenshotUpload}
-                          className="hidden"
-                          id="upi-ss-upload"
-                        />
-                        <label
-                          htmlFor="upi-ss-upload"
-                          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold cursor-pointer inline-block transition"
-                        >
-                          Browse Receipt Image
-                        </label>
-                      </>
-                    )}
-                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleScreenshotUpload}
+                    className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                  />
                 </div>
 
-                {/* Submit Order Button */}
+                {/* 1-TAP COMPLETED PAYMENT SUBMIT BUTTON */}
                 <button
                   type="submit"
-                  disabled={isSubmittingOrder || !transactionId.trim() || !paymentScreenshot}
-                  className={`w-full py-4 rounded-2xl text-xs font-black shadow-xl transition flex items-center justify-center gap-2 ${
-                    transactionId.trim() && paymentScreenshot
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30'
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                  }`}
+                  disabled={isSubmittingOrder}
+                  className="w-full py-5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-sm shadow-xl shadow-emerald-600/30 flex items-center justify-center gap-2 transition"
                 >
-                  <Lock size={16} />
+                  <CheckCircle2 size={20} />
                   <span>
-                    {isSubmittingOrder ? 'Submitting Payment Proof...' : `Submit Payment Proof & Place Order (₹${grandTotal.toFixed(2)})`}
+                    {isSubmittingOrder ? 'Submitting Order...' : 'I HAVE COMPLETED PAYMENT'}
                   </span>
-                  <ArrowRight size={16} />
                 </button>
 
-                <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-[11px] text-amber-800 font-medium leading-relaxed">
-                  <strong>Verification Note:</strong> Order status will be set to <em>Payment Verification Pending</em>. Account details belong to <strong>{merchantName}</strong>. Our team will verify your UTR and confirm your order.
+                <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-900 font-medium leading-relaxed">
+                  <strong>Confirmation Guarantee:</strong> After clicking <em>I HAVE COMPLETED PAYMENT</em>, your order status will be set to <strong>Payment Verification Pending</strong> and our system will confirm your order shortly.
                 </div>
 
               </div>

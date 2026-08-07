@@ -22,27 +22,16 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
-const INITIAL_WELCOME = `👋 Welcome to HC DTF STORE!
+const FIRST_WELCOME_MESSAGE = `👋 Welcome to HC DTF STORE.
 
-I'm 🤖 HISUHI AI, your smart shopping assistant.
+Please choose your preferred language.
 
-🌍 I can help you in your preferred language.
-
-Please choose a language or simply start typing.
-
-1️⃣ English 🇬🇧
-2️⃣ తెలుగు 🇮🇳
-3️⃣ हिन्दी 🇮🇳
-4️⃣ ಕನ್ನಡ 🇮🇳
-5️⃣ தமிழ் 🇮🇳
-6️⃣ മലയാളം 🇮🇳
-7️⃣ বাংলা 🇮🇳
-8️⃣ मराठी 🇮🇳
-9️⃣ ગુજરાતી 🇮🇳
-🔟 ਪੰਜਾਬੀ 🇮🇳
-
-Or just send a message in your own language.
-I'll automatically continue in that language.`;
+🇮🇳 English
+🇮🇳 తెలుగు
+🇮🇳 हिन्दी
+🇮🇳 ಕನ್ನಡ
+🇮🇳 தமிழ்
+🇮🇳 മലയാളം`;
 
 export default function HisuhiAiWidget() {
   const router = useRouter();
@@ -54,17 +43,15 @@ export default function HisuhiAiWidget() {
     {
       id: 'welcome-1',
       sender: 'hisuhi',
-      text: INITIAL_WELCOME,
+      text: FIRST_WELCOME_MESSAGE,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       suggestedActions: [
-        { label: '1️⃣ English 🇬🇧', payload: 'Hello' },
-        { label: '2️⃣ తెలుగు 🇮🇳', payload: 'నమస్కారం' },
-        { label: '3️⃣ हिन्दी 🇮🇳', payload: 'नमस्ते' },
-        { label: '4️⃣ ಕನ್ನಡ 🇮🇳', payload: 'ನಮಸ್ಕಾರ' },
-        { label: '5️⃣ தமிழ் 🇮🇳', payload: 'வணக்கம்' },
-        { label: '6️⃣ Track Order 📦', payload: 'Where is my order?' },
-        { label: '7️⃣ Payment UPI 💳', payload: 'How to pay?' },
-        { label: '8️⃣ Shipping Rates 🚚', payload: 'What are shipping charges?' }
+        { label: '🇮🇳 English', payload: 'Hello' },
+        { label: '🇮🇳 తెలుగు', payload: 'నమస్కారం' },
+        { label: '🇮🇳 हिन्दी', payload: 'नमस्ते' },
+        { label: '🇮🇳 ಕನ್ನಡ', payload: 'ನಮಸ್ಕಾರ' },
+        { label: '🇮🇳 தமிழ்', payload: 'வணக்கம்' },
+        { label: '🇮🇳 മലയാളം', payload: 'നമസ്കാരം' }
       ]
     }
   ]);
@@ -132,7 +119,7 @@ export default function HisuhiAiWidget() {
         {
           id: `bot-err-${Date.now()}`,
           sender: 'hisuhi',
-          text: "I'm HISUHI AI. I'm connected and ready to assist you! What product or order details would you like to know?",
+          text: "I'm HISUHI AI, your shopping assistant! How can I help you choose or track your order today?",
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -211,7 +198,7 @@ export default function HisuhiAiWidget() {
                     Official
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400">HC DTF STORE Smart Assistant</p>
+                <p className="text-[11px] text-slate-400">HC DTF STORE Shopping Assistant</p>
               </div>
             </div>
 
@@ -301,7 +288,7 @@ export default function HisuhiAiWidget() {
             {isLoading && (
               <div className="flex items-center gap-2 text-xs text-slate-500 bg-white p-3 rounded-2xl border border-slate-200 w-fit">
                 <RefreshCw size={14} className="animate-spin text-emerald-600" />
-                <span>HISUHI AI is thinking...</span>
+                <span>HISUHI AI is typing...</span>
               </div>
             )}
 
