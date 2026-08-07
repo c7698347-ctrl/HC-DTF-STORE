@@ -14,118 +14,73 @@ import {
   RefreshCw, 
   PhoneCall,
   RotateCcw,
-  Globe
+  Eye,
+  Share2,
+  Check
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
-const FIRST_WELCOME_MESSAGE = `👋 Welcome to HC DTF STORE.
-
-Please choose your preferred language.
-
-🇮🇳 English
-🇮🇳 తెలుగు
-🇮🇳 हिन्दी
-🇮🇳 ಕನ್ನಡ
-🇮🇳 தமிழ்
-🇮🇳 മലയാളം`;
-
-const INITIAL_WELCOME_MESSAGE_OBJ = {
-  id: 'welcome-1',
-  sender: 'hisuhi',
-  text: FIRST_WELCOME_MESSAGE,
-  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-  suggestedActions: [
-    { label: '🇮🇳 English', payload: 'English' },
-    { label: '🇮🇳 తెలుగు', payload: 'తెలుగు' },
-    { label: '🇮🇳 हिन्दी', payload: 'हिन्दी' },
-    { label: '🇮🇳 ಕನ್ನಡ', payload: 'ಕನ್ನಡ' },
-    { label: '🇮🇳 தமிழ்', payload: 'தமிழ்' },
-    { label: '🇮🇳 മലയാളം', payload: 'മലയാളം' }
-  ]
-};
-
 export default function HisuhiAiWidget() {
   const router = useRouter();
-  const { orders, products, addToCart } = useStore();
+  const { orders = [], products = [], machines = [], settings = {}, addToCart } = useStore();
 
   const [isOpen, setIsOpen] = useState(false);
   const [inputMsg, setInputMsg] = useState('');
-  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
   
   const chatEndRef = useRef(null);
 
-  // 1. ON COMPONENT MOUNT: Check localStorage for onboardingCompleted & chatHistory
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const isCompleted = localStorage.getItem('hisuhi_onboarding_completed') === 'true';
-      const savedHistory = localStorage.getItem('hisuhi_chat_history');
-
-      if (isCompleted) {
-        setOnboardingCompleted(true);
-        if (savedHistory) {
-          try {
-            const parsed = JSON.parse(savedHistory);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setMessages(parsed);
-              return;
-            }
-          } catch (e) {
-            console.error('Error parsing saved chat history', e);
+      const savedHistory = localStorage.getItem('hisuhi_chat_history_v2');
+      if (savedHistory) {
+        try {
+          const parsed = JSON.parse(savedHistory);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMessages(parsed);
+            return;
           }
+        } catch (e) {
+          console.error('Error parsing saved chat history', e);
         }
-        // If completed but no history found, load default active session message without onboarding list
-        setMessages([
-          {
-            id: 'welcome-active',
-            sender: 'hisuhi',
-            text: "Hello! 👋 I'm **HISUHI AI**, your smart shopping assistant at HC DTF STORE. How can I help you choose or track your order today?",
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            suggestedActions: [
-              { label: '🌺 Blouse Designs', payload: 'Show me Blouse Designs' },
-              { label: '👑 Saree Borders', payload: 'Show me Saree Borders' },
-              { label: '📦 Track My Order', payload: 'Track my order' }
-            ]
-          }
-        ]);
-      } else {
-        // First time visitor: show onboarding
-        setOnboardingCompleted(false);
-        setMessages([INITIAL_WELCOME_MESSAGE_OBJ]);
       }
+
+      setMessages([
+        {
+          id: 'welcome-active',
+          sender: 'hisuhi',
+          text: "Hello 👋 Welcome to HC DTF STORE. How can I help you today?",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          suggestedActions: [
+            { label: '🔥 JUKE Heat Press Machines', payload: 'Heat press machine price' },
+            { label: '📦 Custom Gang Sheets', payload: 'Do you have DTF Gang Sheets?' },
+            { label: '🚚 Shipping Rates', payload: 'How much is shipping?' },
+            { label: '💳 Payment Options', payload: 'How do I pay?' }
+          ]
+        }
+      ]);
     }
   }, []);
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     if (isOpen) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isOpen]);
 
-  // Save chat history & onboarding state to localStorage whenever messages change
-  const saveSession = (newMessages, isCompleted = true) => {
+  const saveSession = (newMessages) => {
     setMessages(newMessages);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('hisuhi_chat_history', JSON.stringify(newMessages.slice(-20))); // Keep last 20 messages
-      if (isCompleted) {
-        localStorage.setItem('hisuhi_onboarding_completed', 'true');
-        setOnboardingCompleted(true);
-      }
+      localStorage.setItem('hisuhi_chat_history_v2', JSON.stringify(newMessages.slice(-25)));
     }
   };
 
   const handleSendMessage = async (textToSend) => {
     const queryText = (textToSend || inputMsg).trim();
     if (!queryText) return;
-
-    // Mark onboarding as completed upon sending any message / selecting language
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('hisuhi_onboarding_completed', 'true');
-      setOnboardingCompleted(true);
-    }
 
     const userMessageObj = {
       id: `user-${Date.now()}`,
@@ -135,7 +90,7 @@ export default function HisuhiAiWidget() {
     };
 
     const updatedUserMessages = [...messages, userMessageObj];
-    saveSession(updatedUserMessages, true);
+    saveSession(updatedUserMessages);
     setInputMsg('');
     setIsLoading(true);
 
@@ -148,7 +103,8 @@ export default function HisuhiAiWidget() {
           history: updatedUserMessages,
           orders,
           products,
-          onboardingCompleted: true
+          machines,
+          settings
         })
       });
 
@@ -158,18 +114,18 @@ export default function HisuhiAiWidget() {
       const botMessageObj = {
         id: `bot-${Date.now()}`,
         sender: 'hisuhi',
-        text: data.reply || "Hello! I'm HISUHI AI. How can I assist your order today?",
+        text: data.reply || "Hello! How can I assist you with HC DTF STORE products or orders today?",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         type: data.type,
         products: data.products,
         showWhatsApp: data.showWhatsApp,
         whatsappNumber: data.whatsappNumber || '7207528651',
-        prefilledMsg: data.prefilledMsg || 'Hi HC DTF STORE 👋 I need assistance regarding my order.',
+        prefilledMsg: data.prefilledMsg || `Hello HC DTF STORE 👋 I have a question regarding: ${queryText}`,
         suggestedActions: data.suggestedActions
       };
 
       const finalMessages = [...updatedUserMessages, botMessageObj];
-      saveSession(finalMessages, true);
+      saveSession(finalMessages);
 
     } catch (e) {
       console.error('HISUHI AI Communication Error', e);
@@ -177,26 +133,50 @@ export default function HisuhiAiWidget() {
       const errMessageObj = {
         id: `bot-err-${Date.now()}`,
         sender: 'hisuhi',
-        text: "I'm HISUHI AI, your shopping assistant! How can I help you choose or track your order today?",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        text: "I'll connect you directly with our WhatsApp team (+91 7207528651) for immediate assistance.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        showWhatsApp: true,
+        whatsappNumber: '7207528651',
+        prefilledMsg: `Hello HC DTF STORE 👋 I need assistance regarding: ${queryText}`
       };
-      saveSession([...updatedUserMessages, errMessageObj], true);
+      saveSession([...updatedUserMessages, errMessageObj]);
     }
   };
 
   const handleResetSession = () => {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('hisuhi_onboarding_completed');
-      localStorage.removeItem('hisuhi_chat_history');
-      localStorage.removeItem('hisuhi_selected_language');
+      localStorage.removeItem('hisuhi_chat_history_v2');
     }
-    setOnboardingCompleted(false);
-    setMessages([INITIAL_WELCOME_MESSAGE_OBJ]);
+    setMessages([
+      {
+        id: `welcome-${Date.now()}`,
+        sender: 'hisuhi',
+        text: "Hello 👋 Welcome to HC DTF STORE. How can I help you today?",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        suggestedActions: [
+          { label: '🔥 JUKE Heat Press Machines', payload: 'Heat press machine price' },
+          { label: '📦 Custom Gang Sheets', payload: 'Do you have DTF Gang Sheets?' },
+          { label: '🚚 Shipping Rates', payload: 'How much is shipping?' },
+          { label: '💳 Payment Options', payload: 'How do I pay?' }
+        ]
+      }
+    ]);
+  };
+
+  const handleShareProduct = (prod) => {
+    const link = `${window.location.origin}/product/${prod.slug || prod.id}`;
+    if (navigator.share) {
+      navigator.share({ title: prod.name, text: `${prod.name} - ₹${prod.price}`, url: link }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(link);
+      setCopiedId(prod.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
   };
 
   const handleVoiceInput = () => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      alert('Voice input is not supported on this browser. Please type your message.');
+      alert('Voice input is not supported on this browser.');
       return;
     }
 
@@ -220,10 +200,10 @@ export default function HisuhiAiWidget() {
 
   return (
     <>
-      {/* FLOATING TRIGGER BUTTON WITH IDLE BREATHING ANIMATION */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+      {/* FLOATING TRIGGER BUTTON */}
+      <div className="fixed bottom-20 sm:bottom-6 right-6 z-50 flex flex-col items-end gap-2">
         {!isOpen && (
-          <div className="bg-slate-900 text-white text-[11px] font-extrabold px-3.5 py-1.5 rounded-full shadow-xl border border-emerald-500/40 animate-pulse flex items-center gap-1.5 backdrop-blur-md">
+          <div className="bg-slate-900 text-white text-[11px] font-extrabold px-3.5 py-1.5 rounded-full shadow-xl border border-emerald-500/40 flex items-center gap-1.5 backdrop-blur-md">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             <span>Chat with HISUHI AI</span>
           </div>
@@ -231,8 +211,8 @@ export default function HisuhiAiWidget() {
 
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-14 h-14 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-800 text-white flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 border-2 border-emerald-400/40 relative group animate-bounce duration-[3000ms]"
-          title="Open HISUHI AI Shopping Assistant"
+          className="w-14 h-14 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-800 text-white flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 border-2 border-emerald-400/40 relative group"
+          title="Open HISUHI AI Conversational Assistant"
         >
           {isOpen ? (
             <X size={26} />
@@ -245,25 +225,21 @@ export default function HisuhiAiWidget() {
         </button>
       </div>
 
-      {/* CHAT MODAL WINDOW */}
+      {/* CHAT WINDOW */}
       {isOpen && (
         <div className="fixed bottom-24 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-96 h-[540px] max-h-[85vh] bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200">
           
-          {/* TOP HEADER */}
+          {/* HEADER */}
           <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
             <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-600/30 text-emerald-400 flex items-center justify-center border border-emerald-500/30 font-black">
-                  <Bot size={22} />
-                </div>
-                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900 animate-ping" />
+              <div className="w-10 h-10 rounded-2xl bg-emerald-600/30 text-emerald-400 flex items-center justify-center border border-emerald-500/30 font-black">
+                <Bot size={22} />
               </div>
-
               <div>
                 <div className="flex items-center gap-1.5">
                   <h3 className="font-black text-sm text-white tracking-tight">HISUHI AI</h3>
-                  <span className="text-[10px] uppercase font-bold bg-emerald-950 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded">
-                    Official
+                  <span className="text-[9px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded uppercase">
+                    Conversational
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400">HC DTF STORE Assistant</p>
@@ -274,7 +250,7 @@ export default function HisuhiAiWidget() {
               <button
                 onClick={handleResetSession}
                 className="p-1.5 text-slate-400 hover:text-emerald-400 rounded-xl hover:bg-slate-800 transition"
-                title="Clear Chat / Reset Language"
+                title="Reset Chat Session"
               >
                 <RotateCcw size={16} />
               </button>
@@ -295,7 +271,7 @@ export default function HisuhiAiWidget() {
                 className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
               >
                 <div
-                  className={`max-w-[85%] p-3.5 rounded-2xl text-xs whitespace-pre-wrap leading-relaxed shadow-sm ${
+                  className={`max-w-[88%] p-3.5 rounded-2xl text-xs whitespace-pre-wrap leading-relaxed shadow-sm ${
                     msg.sender === 'user'
                       ? 'bg-emerald-600 text-white font-medium rounded-br-none'
                       : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none font-sans'
@@ -303,39 +279,55 @@ export default function HisuhiAiWidget() {
                 >
                   {msg.text}
 
-                  {/* PRODUCT RECOMMENDATIONS CARDS */}
+                  {/* RICH PRODUCT CAROUSEL CARDS */}
                   {msg.products && msg.products.length > 0 && (
-                    <div className="mt-3 space-y-2 text-left">
+                    <div className="mt-3 space-y-3 text-left">
                       {msg.products.map((prod) => (
-                        <div key={prod.id} className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-2">
-                          <img
-                            src={prod.images?.[0] || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=200'}
-                            alt={prod.name}
-                            className="w-10 h-10 object-cover rounded-lg shrink-0"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-[11px] text-slate-900 truncate">{prod.name}</p>
-                            <p className="text-[10px] text-emerald-700 font-extrabold">₹{prod.offerPrice || prod.price}</p>
+                        <div key={prod.id || prod.name} className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                          <div className="flex gap-3 items-center">
+                            <img
+                              src={prod.image || prod.images?.[0] || '/images/juke_heat_press_16x24.png'}
+                              alt={prod.name}
+                              className="w-14 h-14 object-contain bg-white rounded-xl p-1 border border-slate-200 shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-extrabold text-xs text-slate-900 line-clamp-1">{prod.name}</p>
+                              <p className="text-emerald-600 font-black text-sm">₹{(prod.price || prod.offerPrice)?.toLocaleString()}</p>
+                              <p className="text-[10px] text-slate-500 font-bold">Stock: {prod.stock || 50} Available</p>
+                            </div>
                           </div>
-                          <button
-                            onClick={() => addToCart(prod, 1)}
-                            className="px-2.5 py-1 bg-emerald-600 text-white text-[10px] font-bold rounded-lg shrink-0 hover:bg-emerald-700 transition"
-                          >
-                            + Add
-                          </button>
+
+                          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200">
+                            <a
+                              href={`https://wa.me/917207528651?text=${encodeURIComponent(`Hello HC DTF STORE 👋 I want to order ${prod.name}.`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[11px] font-bold flex items-center justify-center gap-1"
+                            >
+                              <PhoneCall size={12} /> Buy Now
+                            </a>
+
+                            <button
+                              onClick={() => handleShareProduct(prod)}
+                              className="py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1"
+                            >
+                              {copiedId === prod.id ? <Check size={12} className="text-emerald-600" /> : <Share2 size={12} />}
+                              <span>{copiedId === prod.id ? 'Copied' : 'Share'}</span>
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  {/* WHATSAPP SUPPORT BUTTON */}
+                  {/* WHATSAPP SUPPORT DIRECT BUTTON */}
                   {msg.showWhatsApp && (
                     <div className="mt-3 text-left">
                       <a
-                        href={`https://wa.me/91${msg.whatsappNumber || '7207528651'}?text=${encodeURIComponent(msg.prefilledMsg || 'Hi HC DTF STORE 👋 I need assistance regarding my order.')}`}
+                        href={`https://wa.me/91${msg.whatsappNumber || '7207528651'}?text=${encodeURIComponent(msg.prefilledMsg || 'Hello HC DTF STORE 👋 I need assistance.')}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition inline-block text-center"
+                        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition inline-block text-center"
                       >
                         <PhoneCall size={14} /> Connect on WhatsApp (+91 {msg.whatsappNumber})
                       </a>
@@ -345,7 +337,7 @@ export default function HisuhiAiWidget() {
 
                 <span className="text-[10px] text-slate-400 mt-1 px-1">{msg.timestamp}</span>
 
-                {/* SUGGESTED QUICK ACTION PILLS */}
+                {/* SUGGESTED ACTIONS */}
                 {msg.suggestedActions && (
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {msg.suggestedActions.map((act, idx) => (
@@ -365,7 +357,7 @@ export default function HisuhiAiWidget() {
             {isLoading && (
               <div className="flex items-center gap-2 text-xs text-slate-500 bg-white p-3 rounded-2xl border border-slate-200 w-fit">
                 <RefreshCw size={14} className="animate-spin text-emerald-600" />
-                <span>HISUHI AI is typing...</span>
+                <span>HISUHI AI is thinking...</span>
               </div>
             )}
 
@@ -379,14 +371,14 @@ export default function HisuhiAiWidget() {
               className={`p-2.5 rounded-xl transition ${
                 isListening ? 'bg-rose-100 text-rose-600 animate-pulse' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
-              title="Speak message"
+              title="Voice Input"
             >
               {isListening ? <MicOff size={16} /> : <Mic size={16} />}
             </button>
 
             <input
               type="text"
-              placeholder="Ask HISUHI AI anything..."
+              placeholder="Type your message..."
               value={inputMsg}
               onChange={(e) => setInputMsg(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
