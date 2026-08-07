@@ -2,203 +2,103 @@
 
 import React, { useRef } from 'react';
 import Link from 'next/link';
-import { Sparkles, TrendingUp, Award, Flame, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Sparkles, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
 import HeroBanner from '@/components/home/HeroBanner';
+import AnimatedSearchBar from '@/components/home/AnimatedSearchBar';
+import FloatingCornerElements from '@/components/home/FloatingCornerElements';
 import ProductCard from '@/components/product/ProductCard';
 
 export default function HomePage() {
   const { products = [] } = useStore();
 
-  // Filter published active products from single products database
+  // Published active products from single products database
   const publishedProducts = (products || []).filter((p) => p.status !== 'Draft' && p.enabled !== false);
 
-  // Ensure 4 non-overlapping sets of 8-10 distinct products
-  const trendingProducts = publishedProducts.slice(0, 8);
-  const bestSellerProducts = publishedProducts.slice(4, 12).length >= 4 ? publishedProducts.slice(4, 12) : publishedProducts.slice(0, 8);
-  const newArrivalProducts = publishedProducts.slice(8, 16).length >= 4 ? publishedProducts.slice(8, 16) : publishedProducts.slice(2, 10);
-  const recommendedProducts = publishedProducts.filter(p => p.isPremium || p.price >= 300).slice(0, 8);
+  const scrollRef = useRef(null);
 
-  const trendingRef = useRef(null);
-  const bestSellerRef = useRef(null);
-  const newArrivalRef = useRef(null);
-  const recommendedRef = useRef(null);
-
-  const scrollLeft = (ref) => {
-    if (ref.current) ref.current.scrollBy({ left: -320, behavior: 'smooth' });
+  const scrollLeft = () => {
+    if (scrollRef.current) scrollRef.current.scrollBy({ left: -320, behavior: 'smooth' });
   };
 
-  const scrollRight = (ref) => {
-    if (ref.current) ref.current.scrollBy({ left: 320, behavior: 'smooth' });
+  const scrollRight = () => {
+    if (scrollRef.current) scrollRef.current.scrollBy({ left: 320, behavior: 'smooth' });
   };
 
   return (
-    <div className="space-y-16 pb-16 bg-[#FAFBFB]">
+    <div className="space-y-12 pb-16 bg-[#FAFBFB] relative min-h-screen">
       
+      {/* Corner Floating Micro-Animations */}
+      <FloatingCornerElements />
+
       {/* 1. HERO BANNER SLIDER */}
       <HeroBanner />
 
-      {/* 2. TRENDING PRODUCTS (HORIZONTAL SCROLL 8-10 PRODUCTS) */}
+      {/* 2. LARGE PREMIUM SEARCH BAR */}
+      <AnimatedSearchBar />
+
+      {/* 3. NEW ARRIVALS (ONLY ONE HORIZONTAL SCROLL PRODUCT SECTION) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        
+        {/* Clean, Non-Repetitive Section Header */}
         <div className="flex items-center justify-between border-b border-slate-200/80 pb-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold">
-              <TrendingUp size={14} /> Trending Now
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Trending Products
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">
+              NEW ARRIVALS
             </h2>
+            <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-extrabold hidden sm:inline-block">
+              {publishedProducts.length} Items
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => scrollLeft(trendingRef)}
-              className="p-2 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
+              onClick={scrollLeft}
+              className="p-2.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
               title="Scroll Left"
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={20} />
             </button>
             <button
-              onClick={() => scrollRight(trendingRef)}
-              className="p-2 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
+              onClick={scrollRight}
+              className="p-2.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
               title="Scroll Right"
             >
-              <ChevronRight size={18} />
+              <ChevronRight size={20} />
             </button>
           </div>
         </div>
 
-        <div
-          ref={trendingRef}
-          className="flex gap-6 overflow-x-auto scrollbar-none pb-4 pt-1 scroll-smooth snap-x snap-mandatory"
-        >
-          {trendingProducts.map((prod) => (
-            <div key={`trending-${prod.id}`} className="min-w-[260px] sm:min-w-[290px] max-w-[290px] shrink-0 snap-start">
-              <ProductCard product={prod} />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 3. BEST SELLERS (HORIZONTAL SCROLL 8-10 PRODUCTS) */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-200/80 pb-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-900 rounded-full text-xs font-bold border border-amber-200">
-              <Award size={14} className="text-amber-600" /> Best Sellers
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Best Sellers
-            </h2>
+        {/* Horizontal Scrolling Products (Never Duplicated) */}
+        {publishedProducts.length > 0 ? (
+          <div
+            ref={scrollRef}
+            className="flex gap-6 overflow-x-auto scrollbar-none pb-6 pt-1 scroll-smooth snap-x snap-mandatory"
+          >
+            {publishedProducts.map((prod) => (
+              <div key={prod.id} className="min-w-[270px] sm:min-w-[300px] max-w-[300px] shrink-0 snap-start">
+                <ProductCard product={prod} />
+              </div>
+            ))}
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => scrollLeft(bestSellerRef)}
-              className="p-2 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button
-              onClick={() => scrollRight(bestSellerRef)}
-              className="p-2 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
-            >
-              <ChevronRight size={18} />
-            </button>
+        ) : (
+          <div className="bg-white rounded-3xl p-12 text-center space-y-2 border border-slate-200 max-w-md mx-auto shadow-sm">
+            <p className="text-sm font-extrabold text-slate-900">No products uploaded yet.</p>
+            <p className="text-xs text-slate-500">Products uploaded in Admin Panel will appear here automatically.</p>
           </div>
+        )}
+
+        <div className="text-center pt-4">
+          <Link
+            href="/shop"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-600/20 hover:scale-105 transition"
+          >
+            <span>Explore Complete Store Catalog</span>
+            <ArrowRight size={18} />
+          </Link>
         </div>
 
-        <div
-          ref={bestSellerRef}
-          className="flex gap-6 overflow-x-auto scrollbar-none pb-4 pt-1 scroll-smooth snap-x snap-mandatory"
-        >
-          {bestSellerProducts.map((prod) => (
-            <div key={`bestseller-${prod.id}`} className="min-w-[260px] sm:min-w-[290px] max-w-[290px] shrink-0 snap-start">
-              <ProductCard product={prod} />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 4. NEW ARRIVALS (HORIZONTAL SCROLL 8-10 PRODUCTS) */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-200/80 pb-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-800 rounded-full text-xs font-bold">
-              <Sparkles size={14} className="text-emerald-600" /> New Arrivals
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              New Arrivals
-            </h2>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => scrollLeft(newArrivalRef)}
-              className="p-2 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button
-              onClick={() => scrollRight(newArrivalRef)}
-              className="p-2 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        </div>
-
-        <div
-          ref={newArrivalRef}
-          className="flex gap-6 overflow-x-auto scrollbar-none pb-4 pt-1 scroll-smooth snap-x snap-mandatory"
-        >
-          {newArrivalProducts.map((prod) => (
-            <div key={`new-${prod.id}`} className="min-w-[260px] sm:min-w-[290px] max-w-[290px] shrink-0 snap-start">
-              <ProductCard product={prod} />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 5. RECOMMENDED FOR YOU (AI PERSONALIZED, HORIZONTAL SCROLL 8-10 PRODUCTS) */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-200/80 pb-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-full text-xs font-bold border border-emerald-200">
-              <Sparkles size={14} className="text-emerald-600 animate-spin" /> Recommended For You
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Recommended For You
-            </h2>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => scrollLeft(recommendedRef)}
-              className="p-2 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button
-              onClick={() => scrollRight(recommendedRef)}
-              className="p-2 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        </div>
-
-        <div
-          ref={recommendedRef}
-          className="flex gap-6 overflow-x-auto scrollbar-none pb-4 pt-1 scroll-smooth snap-x snap-mandatory"
-        >
-          {recommendedProducts.map((prod) => (
-            <div key={`recommended-${prod.id}`} className="min-w-[260px] sm:min-w-[290px] max-w-[290px] shrink-0 snap-start">
-              <ProductCard product={prod} />
-            </div>
-          ))}
-        </div>
       </section>
 
     </div>

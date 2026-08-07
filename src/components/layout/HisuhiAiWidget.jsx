@@ -152,10 +152,10 @@ export default function HisuhiAiWidget() {
 
   return (
     <>
-      {/* FLOATING TRIGGER BUTTON */}
+      {/* FLOATING TRIGGER BUTTON WITH IDLE BREATHING ANIMATION */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
         {!isOpen && (
-          <div className="bg-slate-900 text-white text-[11px] font-extrabold px-3.5 py-1.5 rounded-full shadow-lg border border-emerald-500/40 animate-bounce flex items-center gap-1.5">
+          <div className="bg-slate-900 text-white text-[11px] font-extrabold px-3.5 py-1.5 rounded-full shadow-xl border border-emerald-500/40 animate-pulse flex items-center gap-1.5 backdrop-blur-md">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             <span>Chat with HISUHI AI</span>
           </div>
@@ -163,7 +163,7 @@ export default function HisuhiAiWidget() {
 
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-14 h-14 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-800 text-white flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition border-2 border-emerald-400/40 relative group"
+          className="w-14 h-14 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-800 text-white flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 border-2 border-emerald-400/40 relative group animate-bounce duration-[3000ms]"
           title="Open HISUHI AI Shopping Assistant"
         >
           {isOpen ? (
@@ -188,17 +188,17 @@ export default function HisuhiAiWidget() {
                 <div className="w-10 h-10 rounded-2xl bg-emerald-600/30 text-emerald-400 flex items-center justify-center border border-emerald-500/30 font-black">
                   <Bot size={22} />
                 </div>
-                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900" />
+                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900 animate-ping" />
               </div>
 
               <div>
                 <div className="flex items-center gap-1.5">
                   <h3 className="font-black text-sm text-white tracking-tight">HISUHI AI</h3>
                   <span className="text-[10px] uppercase font-bold bg-emerald-950 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded">
-                    Official
+                    Official Assistant
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400">HC DTF STORE Shopping Assistant</p>
+                <p className="text-[11px] text-slate-400">HC DTF STORE Assistant</p>
               </div>
             </div>
 
