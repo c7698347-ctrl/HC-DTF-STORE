@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Mic, Sparkles, Flame, ArrowRight, Layers } from 'lucide-react';
+import { Search, Mic, Sparkles, Flame, ArrowRight } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
 const PLACEHOLDERS = [
@@ -15,10 +15,10 @@ const PLACEHOLDERS = [
 
 export default function AnimatedSearchBar() {
   const router = useRouter();
-  const { products } = useStore();
+  const { products = [] } = useStore();
 
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const [displayedPlaceholder, setDisplayedPlaceholder] = useState('');
+  const [displayedPlaceholder, setDisplayedPlaceholder] = useState('Search DTF Prints...');
   const [isTyping, setIsTyping] = useState(true);
 
   const [query, setQuery] = useState('');
@@ -28,7 +28,7 @@ export default function AnimatedSearchBar() {
 
   const containerRef = useRef(null);
 
-  // Rotating typing placeholder effect
+  // Rotating typing placeholder effect starting after mount
   useEffect(() => {
     let timeout;
     const currentTargetText = PLACEHOLDERS[placeholderIndex];
@@ -116,18 +116,18 @@ export default function AnimatedSearchBar() {
   };
 
   return (
-    <div ref={containerRef} className="max-w-4xl mx-auto px-4 relative my-8">
+    <div ref={containerRef} className="max-w-4xl mx-auto px-4 relative my-8 min-h-[64px]">
       
       {/* Decorative Micro-Animations around Search Bar */}
-      <div className="absolute -top-3 left-8 text-emerald-500 opacity-40 animate-pulse pointer-events-none">
+      <div className="absolute -top-3 left-8 text-emerald-500/40 animate-pulse pointer-events-none">
         <Sparkles size={16} />
       </div>
-      <div className="absolute -bottom-3 right-12 text-amber-500 opacity-30 animate-bounce pointer-events-none">
+      <div className="absolute -bottom-3 right-12 text-amber-500/30 animate-bounce pointer-events-none">
         <Flame size={16} />
       </div>
 
       <form onSubmit={handleSearchSubmit} className="relative z-10">
-        <div className="glass-card bg-white/95 backdrop-blur-md rounded-3xl p-2.5 sm:p-3 shadow-xl border border-slate-200/90 flex items-center gap-3 transition-all duration-300 focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10">
+        <div className="glass-card bg-white/95 backdrop-blur-md rounded-3xl p-2.5 sm:p-3 shadow-xl border border-slate-200/90 flex items-center gap-3 transition-all duration-300 focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10 min-h-[58px]">
           
           <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 ml-1">
             <Search size={20} />
@@ -139,7 +139,7 @@ export default function AnimatedSearchBar() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onFocus={() => setIsFocused(true)}
-              placeholder={displayedPlaceholder || 'Search DTF Prints...'}
+              placeholder={displayedPlaceholder}
               className="w-full bg-transparent text-slate-900 font-extrabold text-sm sm:text-base placeholder:text-slate-400 placeholder:font-medium focus:outline-none py-2"
             />
           </div>

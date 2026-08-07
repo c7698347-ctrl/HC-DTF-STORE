@@ -3,68 +3,71 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
-import { useStore } from '@/context/StoreContext';
 
-const DEFAULT_HERO_BANNERS = [
+const HERO_SLIDES = [
   {
-    id: 'banner-1',
-    title: 'Premium DTF Prints',
+    id: 'slide-1',
+    title: 'Premium DTF Transfers',
     subtitle: 'Ultra-HD 2400 DPI Garment Transfer Rolls & Gang Sheets',
     buttonText: 'Shop Now',
     buttonLink: '/shop',
     image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=1200'
   },
   {
-    id: 'banner-2',
+    id: 'slide-2',
     title: 'Festival Collection',
     subtitle: 'Metallic Gold, Dussehra & Diwali Garment Transfer Prints',
-    buttonText: 'Explore',
+    buttonText: 'Explore Collection',
     buttonLink: '/shop?cat=Festival',
     image: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&q=80&w=1200'
   },
   {
-    id: 'banner-3',
-    title: 'Custom DTF Printing',
+    id: 'slide-3',
+    title: 'Custom Printing',
     subtitle: 'Upload Your Custom Design Gang Sheet & Get Express Same-Day Dispatch',
-    buttonText: 'Upload Design',
+    buttonText: 'Upload Your Design',
     buttonLink: '/shop',
     image: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&q=80&w=1200'
   }
 ];
 
 export default function HeroBanner() {
-  const { banners = [] } = useStore();
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  const displayBanners = (Array.isArray(banners) && banners.filter((b) => b.active).length > 0)
-    ? banners.filter((b) => b.active)
-    : DEFAULT_HERO_BANNERS;
-
   useEffect(() => {
-    if (displayBanners.length <= 1) return;
     const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % displayBanners.length);
+      setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, [displayBanners.length]);
+  }, []);
 
-  const current = displayBanners[currentSlide];
+  const current = HERO_SLIDES[currentSlide];
 
   return (
-    <section className="relative overflow-hidden bg-slate-950 py-16 md:py-24 text-white">
-      {/* Background Image with Dark Gradient Transition */}
+    <section className="relative overflow-hidden bg-slate-950 text-white min-h-[460px] sm:min-h-[520px] flex items-center justify-between">
+      
+      {/* Background Slides with Fixed Aspect Ratio & Crossfade */}
       <div className="absolute inset-0 z-0">
-        <img
-          key={current.id || currentSlide}
-          src={current.image}
-          alt={current.title}
-          className="w-full h-full object-cover opacity-30 transition-all duration-700 ease-in-out scale-105"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/85 to-transparent" />
-        <div className="absolute inset-0 bg-radial-gradient from-emerald-600/10 via-transparent to-transparent" />
+        {HERO_SLIDES.map((slide, idx) => (
+          <div
+            key={slide.id}
+            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+              idx === currentSlide ? 'opacity-30 z-10' : 'opacity-0 z-0'
+            }`}
+          >
+            <img
+              src={slide.image}
+              alt={slide.title}
+              className="w-full h-full object-cover scale-105"
+              loading={idx === 0 ? 'eager' : 'lazy'}
+            />
+          </div>
+        ))}
+        <div className="absolute inset-0 z-20 bg-gradient-to-r from-slate-950 via-slate-950/85 to-transparent" />
+        <div className="absolute inset-0 z-20 bg-radial-gradient from-emerald-600/10 via-transparent to-transparent" />
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 relative z-30 py-16 sm:py-24">
         <div className="max-w-2xl space-y-6">
           
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold backdrop-blur-md">
@@ -72,20 +75,20 @@ export default function HeroBanner() {
             <span>HC DTF STORE • Premium DTF Printing</span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white leading-tight">
+          <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white leading-tight min-h-[72px]">
             {current.title}
           </h1>
 
-          <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-xl">
+          <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-xl min-h-[48px]">
             {current.subtitle}
           </p>
 
           <div className="flex flex-wrap items-center gap-4 pt-2">
             <Link
-              href={current.buttonLink || '/shop'}
+              href={current.buttonLink}
               className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-600/30 hover:scale-105 transition duration-300 flex items-center gap-2"
             >
-              <span>{current.buttonText || 'Shop Now'}</span>
+              <span>{current.buttonText}</span>
               <ArrowRight size={18} />
             </Link>
           </div>
@@ -110,25 +113,25 @@ export default function HeroBanner() {
       </div>
 
       {/* Slider Controls */}
-      {displayBanners.length > 1 && (
-        <div className="absolute bottom-6 right-6 z-10 flex items-center gap-2">
-          <button
-            onClick={() => setCurrentSlide((prev) => (prev - 1 + displayBanners.length) % displayBanners.length)}
-            className="p-2.5 rounded-full bg-slate-900/80 hover:bg-emerald-600 text-white border border-slate-700 transition shadow-lg"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <span className="text-xs font-mono font-bold text-slate-300 px-2">
-            {currentSlide + 1} / {displayBanners.length}
-          </span>
-          <button
-            onClick={() => setCurrentSlide((prev) => (prev + 1) % displayBanners.length)}
-            className="p-2.5 rounded-full bg-slate-900/80 hover:bg-emerald-600 text-white border border-slate-700 transition shadow-lg"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
-      )}
+      <div className="absolute bottom-6 right-6 z-30 flex items-center gap-2">
+        <button
+          onClick={() => setCurrentSlide((prev) => (prev - 1 + HERO_SLIDES.length) % HERO_SLIDES.length)}
+          className="p-2.5 rounded-full bg-slate-900/80 hover:bg-emerald-600 text-white border border-slate-700 transition shadow-lg"
+          aria-label="Previous Slide"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <span className="text-xs font-mono font-bold text-slate-300 px-2">
+          {currentSlide + 1} / {HERO_SLIDES.length}
+        </span>
+        <button
+          onClick={() => setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length)}
+          className="p-2.5 rounded-full bg-slate-900/80 hover:bg-emerald-600 text-white border border-slate-700 transition shadow-lg"
+          aria-label="Next Slide"
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
 
     </section>
   );
