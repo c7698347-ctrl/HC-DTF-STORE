@@ -6,6 +6,7 @@ import CartDrawer from '@/components/checkout/CartDrawer';
 import AuthModal from '@/components/auth/AuthModal';
 import ProductDetailModal from '@/components/product/ProductDetailModal';
 import HisuhiAiWidget from '@/components/layout/HisuhiAiWidget';
+import SplashScreen from '@/components/layout/SplashScreen';
 
 export const metadata = {
   title: 'HC DTF STORE - Premium Direct-To-Film Transfer Sheets & Patches',
@@ -23,6 +24,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className="min-h-screen flex flex-col justify-between bg-[#FAFBFB] text-slate-900 font-sans antialiased">
         <StoreProvider>
+          <SplashScreen />
           <Header />
           <main className="flex-1">
             {children}
