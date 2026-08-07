@@ -22,8 +22,8 @@ export default function WhyChooseUs() {
             <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition">
               <Truck size={24} />
             </div>
-            <h3 className="font-extrabold text-base text-white">Fast Delivery</h3>
-            <p className="text-xs text-slate-400 leading-relaxed font-medium">Fast & Secure Delivery Across India</p>
+            <h3 className="font-extrabold text-base text-white">SAME DAY DELIVERY</h3>
+            <p className="text-xs text-slate-400 leading-relaxed font-medium">Available in selected service areas</p>
           </div>
 
           {/* Feature 2 */}
@@ -31,8 +31,8 @@ export default function WhyChooseUs() {
             <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition">
               <Shield size={24} />
             </div>
-            <h3 className="font-extrabold text-base text-white">2400 DPI Premium Print</h3>
-            <p className="text-xs text-slate-400 leading-relaxed font-medium">2400 DPI • 25+ Wash Durability</p>
+            <h3 className="font-extrabold text-base text-white">30+ WASHES</h3>
+            <p className="text-xs text-slate-400 leading-relaxed font-medium">Premium long-lasting DTF prints</p>
           </div>
 
           {/* Feature 3 */}
@@ -40,8 +40,8 @@ export default function WhyChooseUs() {
             <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition">
               <Clock size={24} />
             </div>
-            <h3 className="font-extrabold text-base text-white">Ready-To-Print DTF Transfers</h3>
-            <p className="text-xs text-slate-400 leading-relaxed font-medium">Available in 1 Meter, 22×39 & 12×39 Sizes</p>
+            <h3 className="font-extrabold text-base text-white">2400 DPI PRINT QUALITY</h3>
+            <p className="text-xs text-slate-400 leading-relaxed font-medium">Ultra HD vibrant colors</p>
           </div>
 
           {/* Feature 4 */}
@@ -49,8 +49,8 @@ export default function WhyChooseUs() {
             <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition">
               <ShieldCheck size={24} />
             </div>
-            <h3 className="font-extrabold text-base text-white">Premium Quality Checked</h3>
-            <p className="text-xs text-slate-400 leading-relaxed font-medium">Every Order Is Quality Inspected Before Dispatch</p>
+            <h3 className="font-extrabold text-base text-white">QUALITY CHECKED</h3>
+            <p className="text-xs text-slate-400 leading-relaxed font-medium">Every order inspected before dispatch</p>
           </div>
 
         </div>
