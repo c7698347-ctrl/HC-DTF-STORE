@@ -20,15 +20,13 @@ import {
   Check,
   Percent,
   Mic,
-  MicOff,
   PhoneCall,
   ShieldCheck,
-  HelpCircle,
-  FileText,
   Home as HomeIcon,
   Tag,
-  Layers,
-  Upload
+  Upload,
+  Settings as SettingsIcon,
+  SlidersHorizontal
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import { LANGUAGES } from '@/lib/i18n';
@@ -51,7 +49,6 @@ export default function Header() {
   } = useStore();
 
   const [isDrawerMenuOpen, setIsDrawerMenuOpen] = useState(false);
-  const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -116,7 +113,7 @@ export default function Header() {
   const activeLangObj = LANGUAGES.find((l) => l.code === lang) || LANGUAGES[0];
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-white shadow-sm">
+    <header className="sticky top-0 z-40 w-full bg-white shadow-xs">
       {/* Top Announcement Bar */}
       <div className="bg-slate-950 text-white text-xs py-2 px-4 border-b border-slate-800">
         <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
@@ -144,18 +141,18 @@ export default function Header() {
       </div>
 
       {/* Main Navbar */}
-      <nav className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
+      <nav className="bg-white/95 backdrop-blur-md border-b border-slate-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20 gap-4">
             
             {/* Left Menu Button */}
             <button
               onClick={() => setIsDrawerMenuOpen(true)}
-              className="p-2 text-slate-800 hover:text-emerald-600 hover:bg-slate-100 rounded-2xl transition flex items-center gap-2 font-extrabold text-xs"
+              className="p-2 text-slate-900 hover:text-emerald-600 hover:bg-slate-100 rounded-2xl transition flex items-center gap-2 font-extrabold text-xs"
               aria-label="Open Navigation Menu"
             >
-              <Menu size={22} />
-              <span className="hidden sm:inline uppercase tracking-wider">Menu</span>
+              <Menu size={24} />
+              <span className="hidden sm:inline uppercase tracking-wider font-black">☰ Menu</span>
             </button>
 
             {/* Center Brand Logo */}
@@ -173,28 +170,11 @@ export default function Header() {
               </div>
             </Link>
 
-            {/* Desktop Center Links */}
-            <div className="hidden xl:flex items-center gap-6 font-bold text-slate-800 text-xs uppercase tracking-wider">
-              <Link href="/" className="hover:text-emerald-600 transition">
-                {t('home')}
-              </Link>
-              <Link href="/shop?filter=new" className="hover:text-emerald-600 transition">
-                New Arrivals
-              </Link>
-              <Link href="/shop?filter=bestseller" className="hover:text-emerald-600 transition">
-                Best Sellers
-              </Link>
-              <Link href="/flash-sale" className="text-amber-600 hover:text-amber-700 transition flex items-center gap-1">
-                <Flame size={14} className="text-amber-500 animate-bounce" />
-                Offers
-              </Link>
-            </div>
-
-            {/* Right Action Icons: Search, Language, Wishlist, Cart, Profile */}
+            {/* Right Action Icons: Search Bar, Language, Wishlist, Cart, Profile */}
             <div className="flex items-center gap-3 sm:gap-4">
               
-              {/* Search Trigger Input Bar */}
-              <div ref={searchRef} className="relative hidden md:block w-48 lg:w-64">
+              {/* Search Bar */}
+              <div ref={searchRef} className="relative hidden md:block w-48 lg:w-72">
                 <div className="relative">
                   <input
                     type="text"
@@ -253,7 +233,7 @@ export default function Header() {
                 </button>
 
                 {isLangDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-44 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-50 space-y-1">
+                  <div className="absolute right-0 mt-2 w-44 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-50 space-y-1 max-h-64 overflow-y-auto">
                     {LANGUAGES.map((l) => (
                       <button
                         key={l.code}
@@ -283,7 +263,7 @@ export default function Header() {
                 )}
               </Link>
 
-              {/* Cart Drawer Trigger Button */}
+              {/* Cart Drawer Trigger */}
               <button
                 onClick={() => setIsCartOpen(true)}
                 className="relative p-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl transition shadow-md shadow-emerald-600/20"
@@ -347,7 +327,7 @@ export default function Header() {
         </div>
       </nav>
 
-      {/* LEFT SLIDE-OUT MENU DRAWER (SMOOTH SLIDE ANIMATION) */}
+      {/* SIDE MENU DRAWER (CATEGORIES ONLY EXIST HERE) */}
       {isDrawerMenuOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden">
           <div 
@@ -377,73 +357,57 @@ export default function Header() {
                 </button>
               </div>
 
-              {/* Drawer Menu List Items */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-1 divide-y divide-slate-100 text-xs font-bold text-slate-800">
-                <div className="space-y-1 pb-3">
-                  <Link href="/" onClick={() => setIsDrawerMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-emerald-50 hover:text-emerald-700 transition">
-                    <HomeIcon size={18} className="text-emerald-600" /> Home
-                  </Link>
-
-                  <Link href="/shop?filter=new" onClick={() => setIsDrawerMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-emerald-50 hover:text-emerald-700 transition">
-                    <Sparkles size={18} className="text-emerald-600" /> New Arrivals
-                  </Link>
-
-                  <Link href="/shop?filter=bestseller" onClick={() => setIsDrawerMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-emerald-50 hover:text-emerald-700 transition">
-                    <Tag size={18} className="text-emerald-600" /> Best Sellers
-                  </Link>
-
-                  <Link href="/flash-sale" onClick={() => setIsDrawerMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-2xl text-amber-600 hover:bg-amber-50 transition">
-                    <Flame size={18} className="text-amber-500" /> Offers & Flash Sale
-                  </Link>
-
-                  <Link href="/shop" onClick={() => setIsDrawerMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-emerald-50 hover:text-emerald-700 transition">
-                    <Upload size={18} className="text-emerald-600" /> Custom DTF Gang Sheet
-                  </Link>
-                </div>
-
-                {/* Default Categories Section */}
-                <div className="pt-3 pb-3 space-y-1">
+              {/* Drawer Category Navigation List */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs font-bold text-slate-800">
+                
+                {/* Main Navigation */}
+                <div className="space-y-1">
                   <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider px-3 block mb-1">
-                    System Categories
+                    Store Categories
                   </span>
+
                   {categories.map((cat) => (
                     <Link
                       key={cat.id}
                       href={`/shop?cat=${encodeURIComponent(cat.name)}`}
                       onClick={() => setIsDrawerMenuOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 transition"
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-emerald-50 hover:text-emerald-700 transition"
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      {cat.name}
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span>{cat.name}</span>
                     </Link>
                   ))}
                 </div>
 
-                {/* Orders & Legal */}
-                <div className="pt-3 space-y-1">
-                  <Link href="/wishlist" onClick={() => setIsDrawerMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-emerald-50 hover:text-emerald-700 transition">
-                    <Heart size={18} className="text-emerald-600" /> Wishlist ({wishlist.length})
+                {/* Account & Orders */}
+                <div className="pt-3 border-t border-slate-100 space-y-1">
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider px-3 block mb-1">
+                    Account & Orders
+                  </span>
+
+                  <Link href="/shop?filter=bestseller" onClick={() => setIsDrawerMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-emerald-50 hover:text-emerald-700 transition">
+                    <Tag size={16} className="text-emerald-600" /> Best Sellers
+                  </Link>
+
+                  <Link href="/shop?filter=new" onClick={() => setIsDrawerMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-emerald-50 hover:text-emerald-700 transition">
+                    <Sparkles size={16} className="text-emerald-600" /> New Arrivals
+                  </Link>
+
+                  <Link href="/flash-sale" onClick={() => setIsDrawerMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-2xl text-amber-600 hover:bg-amber-50 transition">
+                    <Flame size={16} className="text-amber-500" /> Offers & Flash Sale
                   </Link>
 
                   <Link href="/track-order" onClick={() => setIsDrawerMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-emerald-50 hover:text-emerald-700 transition">
-                    <Package size={18} className="text-emerald-600" /> Orders & Live Tracking
+                    <Package size={16} className="text-emerald-600" /> Orders & Live Tracking
+                  </Link>
+
+                  <Link href="/wishlist" onClick={() => setIsDrawerMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-emerald-50 hover:text-emerald-700 transition">
+                    <Heart size={16} className="text-emerald-600" /> Wishlist ({wishlist.length})
                   </Link>
 
                   <Link href="/contact" onClick={() => setIsDrawerMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-emerald-50 hover:text-emerald-700 transition">
-                    <PhoneCall size={18} className="text-emerald-600" /> Support & Contact
+                    <PhoneCall size={16} className="text-emerald-600" /> Support & Contact
                   </Link>
-
-                  {currentUser && (
-                    <button
-                      onClick={() => {
-                        logoutCustomer();
-                        setIsDrawerMenuOpen(false);
-                      }}
-                      className="w-full text-left flex items-center gap-3 p-3 rounded-2xl text-rose-600 hover:bg-rose-50 transition"
-                    >
-                      <LogOut size={18} /> Logout
-                    </button>
-                  )}
                 </div>
 
               </div>
