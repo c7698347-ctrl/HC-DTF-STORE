@@ -13,7 +13,8 @@ import {
   Flame,
   BarChart3, 
   Settings, 
-  LogOut 
+  LogOut,
+  Wrench
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
@@ -38,6 +39,7 @@ export default function AdminLayout({ children }) {
     { label: 'Orders & Logistics', icon: ShoppingCart, href: '/admin/orders' },
     { label: `Payment Verifications ${pendingCount > 0 ? `(${pendingCount})` : ''}`, icon: CreditCard, href: '/admin/payments', badge: pendingCount },
     { label: 'Customers', icon: Users, href: '/admin/customers' },
+    { label: 'Machines Manager', icon: Wrench, href: '/admin/machines' },
     { label: 'Flash Sale Manager', icon: Flame, href: '/admin/flash-sale' },
     { label: 'Analytics Reports', icon: BarChart3, href: '/admin/reports' },
     { label: 'Store Settings', icon: Settings, href: '/admin/settings' },

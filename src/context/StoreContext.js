@@ -9,6 +9,8 @@ import {
   INITIAL_CUSTOMERS, 
   INITIAL_ORDERS,
   INITIAL_FLASH_SALE,
+  INITIAL_MACHINE_CONFIG,
+  INITIAL_MACHINES_LIST,
   DEFAULT_ADMIN,
   TRACKING_STAGES,
   STATE_SHIPPING_RATES,
@@ -22,7 +24,7 @@ export function StoreProvider({ children }) {
   // 1. Language & i18n
   const [currentLanguage, setCurrentLanguage] = useState('en');
 
-  // 2. Main Store Entities State (Single Shared Products Database)
+  // 2. Main Store Entities State (Single Shared Products & Machines Database)
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [banners, setBanners] = useState(INITIAL_BANNERS);
@@ -31,20 +33,24 @@ export function StoreProvider({ children }) {
   const [customers, setCustomers] = useState(INITIAL_CUSTOMERS);
   const [orders, setOrders] = useState(INITIAL_ORDERS);
 
-  // 3. Customer User Session (OTP Verified Only)
+  // 3. Centralized Machine Module Data Architecture
+  const [machineConfig, setMachineConfigState] = useState(INITIAL_MACHINE_CONFIG);
+  const [machines, setMachinesState] = useState(INITIAL_MACHINES_LIST);
+
+  // 4. Customer User Session (OTP Verified Only)
   const [customerUser, setCustomerUser] = useState(null);
 
-  // 4. Admin Session State
+  // 5. Admin Session State
   const [adminUser, setAdminUser] = useState(null);
 
-  // 5. Customer Cart, Wishlist, Buy Later, Recently Viewed
+  // 6. Customer Cart, Wishlist, Buy Later, Recently Viewed
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState([]);
   const [buyLater, setBuyLater] = useState([]);
   const [recentlyViewed, setRecentlyViewed] = useState([]);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
 
-  // 6. UI Active Modals & Quick View
+  // 7. UI Active Modals & Quick View
   const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -112,6 +118,17 @@ export function StoreProvider({ children }) {
         const parsed = JSON.parse(savedSettings);
         setSettings((prev) => ({ ...prev, ...parsed }));
       }
+
+      // Machine Module Persistence Load
+      const savedMachineConfig = localStorage.getItem('hc_dtf_machine_config');
+      if (savedMachineConfig) {
+        setMachineConfigState(JSON.parse(savedMachineConfig));
+      }
+
+      const savedMachinesList = localStorage.getItem('hc_dtf_machines_list');
+      if (savedMachinesList) {
+        setMachinesState(JSON.parse(savedMachinesList));
+      }
     } catch (e) {
       console.error('LocalStorage load error', e);
     }
@@ -141,8 +158,44 @@ export function StoreProvider({ children }) {
     localStorage.setItem('hc_dtf_settings', JSON.stringify(settings));
   }, [settings]);
 
+  useEffect(() => {
+    localStorage.setItem('hc_dtf_machine_config', JSON.stringify(machineConfig));
+  }, [machineConfig]);
+
+  useEffect(() => {
+    localStorage.setItem('hc_dtf_machines_list', JSON.stringify(machines));
+  }, [machines]);
+
   // Helper i18n Translation getter
   const t = (key) => getTranslation(currentLanguage, key);
+
+  // ================= MACHINE MODULE ACTIONS =================
+  const setMachineConfig = (newConfig) => {
+    setMachineConfigState(newConfig);
+    localStorage.setItem('hc_dtf_machine_config', JSON.stringify(newConfig));
+  };
+
+  const addMachine = (newMach) => {
+    const created = {
+      id: `mach_${Date.now()}`,
+      slug: newMach.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      visible: true,
+      displayOrder: (machines.length + 1),
+      ...newMach
+    };
+    setMachinesState((prev) => [...prev, created]);
+    return created;
+  };
+
+  const updateMachine = (id, fields) => {
+    setMachinesState((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, ...fields } : m))
+    );
+  };
+
+  const deleteMachine = (id) => {
+    setMachinesState((prev) => prev.filter((m) => m.id !== id));
+  };
 
   // ================= ADMIN AUTH ACTIONS =================
   const loginAdmin = (email, password) => {
@@ -360,6 +413,14 @@ export function StoreProvider({ children }) {
         settings,
         customers,
         orders,
+
+        // Machine Module (Centralized Data Architecture)
+        machineConfig,
+        setMachineConfig,
+        machines,
+        addMachine,
+        updateMachine,
+        deleteMachine,
 
         // Sessions
         customerUser,
