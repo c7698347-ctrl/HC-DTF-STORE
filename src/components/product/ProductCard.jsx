@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { Heart, ShoppingBag, Eye, Star } from 'lucide-react';
+import { Heart, ShoppingBag, Eye, Star, Share2, Check, Copy } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
 export default function ProductCard({ product }) {
@@ -13,11 +13,34 @@ export default function ProductCard({ product }) {
     setQuickViewProduct
   } = useStore();
 
+  const [copied, setCopied] = useState(false);
+
   const isWishlisted = (wishlist || []).some((item) => item.id === product.id);
 
   const displayPrice = product.price || product.originalPrice || 0;
   const offerPrice = product.offerPrice || displayPrice;
   const discountPct = product.discountPercent || (displayPrice > offerPrice ? Math.round(((displayPrice - offerPrice) / displayPrice) * 100) : 0);
+
+  const productUrl = typeof window !== 'undefined' 
+    ? `${window.location.origin}/product/${product.slug || product.id}`
+    : `/product/${product.slug || product.id}`;
+
+  const handleShareProduct = (e) => {
+    e.stopPropagation();
+    const shareData = {
+      title: product.name,
+      text: `🔥 Check out this DTF Design on HC DTF STORE: ${product.name} - ₹${offerPrice}`,
+      url: productUrl
+    };
+
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share(shareData).catch(() => {});
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(productUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
     <div className="glass-card rounded-3xl overflow-hidden flex flex-col group relative border border-slate-200/80 bg-white hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300">
@@ -48,21 +71,35 @@ export default function ProductCard({ product }) {
           {product.stock > 10 ? 'In Stock' : product.stock > 0 ? `Only ${product.stock} Left` : 'Out of Stock'}
         </span>
 
-        {/* Wishlist Floating Button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleWishlist(product);
-          }}
-          className={`absolute top-3 right-3 p-2.5 rounded-full backdrop-blur-md transition-all duration-200 ${
-            isWishlisted 
-              ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40' 
-              : 'bg-white/80 text-slate-600 hover:bg-white hover:text-rose-500'
-          }`}
-          title={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
-        >
-          <Heart size={16} className={isWishlisted ? 'fill-current' : ''} />
-        </button>
+        {/* Top Right Floating Action Icons: Wishlist & Share */}
+        <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+          
+          {/* Share Button */}
+          <button
+            onClick={handleShareProduct}
+            className="p-2 rounded-full bg-white/80 text-slate-700 hover:bg-white hover:text-emerald-600 backdrop-blur-md transition shadow-sm"
+            title={copied ? 'Link Copied!' : 'Share Product'}
+          >
+            {copied ? <Check size={15} className="text-emerald-600" /> : <Share2 size={15} />}
+          </button>
+
+          {/* Wishlist Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleWishlist(product);
+            }}
+            className={`p-2 rounded-full backdrop-blur-md transition-all duration-200 ${
+              isWishlisted 
+                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40' 
+                : 'bg-white/80 text-slate-600 hover:bg-white hover:text-rose-500'
+            }`}
+            title={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
+          >
+            <Heart size={15} className={isWishlisted ? 'fill-current' : ''} />
+          </button>
+
+        </div>
 
         {/* Quick View Hover Overlay */}
         <div className="absolute inset-x-0 bottom-3 px-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-2 justify-end">

@@ -13,35 +13,41 @@ import {
   ChevronRight,
   Upload,
   X,
-  Lock
+  Lock,
+  RefreshCw,
+  ShoppingBag,
+  Check
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { useStore } from '@/context/StoreContext';
 
-export default function OrderCard({ order }) {
-  const { settings, resubmitOrderPaymentProof } = useStore();
+const TIMELINE_STAGES = [
+  { id: 'placed', label: 'Order Placed' },
+  { id: 'payment_verified', label: 'Payment Verified' },
+  { id: 'printing', label: 'Printing' },
+  { id: 'packed', label: 'Packed' },
+  { id: 'shipped', label: 'Shipped' },
+  { id: 'out_for_delivery', label: 'Out for Delivery' },
+  { id: 'delivered', label: 'Delivered' }
+];
 
-  const [showResubmitModal, setShowResubmitModal] = useState(false);
-  const [newTransactionId, setNewTransactionId] = useState(order.transactionId || '');
-  const [newScreenshot, setNewScreenshot] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+export default function OrderCard({ order }) {
+  const { settings, addToCart, setIsCartOpen } = useStore();
 
   const generatePDFInvoice = () => {
     const doc = new jsPDF();
     doc.setFontSize(18);
-    doc.text('HC DTF STORE - OFFICIAL TAX INVOICE', 14, 20);
+    doc.text('HC DTF STORE - OFFICIAL ORDER INVOICE', 14, 20);
     doc.setFontSize(10);
     doc.text(`Invoice ID: INV-${order.id}`, 14, 30);
     doc.text(`Order Date: ${new Date(order.createdAt).toLocaleDateString()}`, 14, 36);
-    doc.text(`GSTIN: ${settings?.gstNumber || '36ABCDE1234F1Z5'}`, 14, 42);
 
-    doc.text(`Customer Name: ${order.customerName}`, 14, 52);
-    doc.text(`Email / Phone: ${order.customerEmail} | ${order.customerPhone}`, 14, 58);
-    doc.text(`Shipping Address: ${order.address}`, 14, 64);
-    doc.text(`UPI UTR ID: ${order.transactionId}`, 14, 70);
+    doc.text(`Customer Name: ${order.customerName}`, 14, 46);
+    doc.text(`Email / Phone: ${order.email || order.customerEmail || ''} | ${order.phone || order.customerPhone || ''}`, 14, 52);
+    doc.text(`Payment Status: ${order.status}`, 14, 58);
 
-    let y = 84;
-    doc.text('Items:', 14, y);
+    let y = 70;
+    doc.text('Line Items:', 14, y);
     y += 8;
 
     (order.items || []).forEach((item, index) => {
@@ -52,49 +58,34 @@ export default function OrderCard({ order }) {
     y += 6;
     doc.text(`Subtotal: Rs.${order.subtotal}`, 14, y);
     y += 6;
-    doc.text(`GST (18%): Rs.${order.gst}`, 14, y);
-    y += 6;
-    doc.text(`Shipping Charges: Rs.${order.shipping}`, 14, y);
+    doc.text(`State Shipping Charge: Rs.${order.shippingFee || order.shipping || 0}`, 14, y);
     y += 8;
     doc.setFontSize(12);
-    doc.text(`Total Amount Paid: Rs.${order.total}`, 14, y);
+    doc.text(`Total Paid Amount: Rs.${order.total}`, 14, y);
 
-    doc.save(`Tax_Invoice_${order.id}.pdf`);
+    doc.save(`Invoice_${order.id}.pdf`);
   };
 
-  const handleScreenshotUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      setNewScreenshot(evt.target.result);
-    };
-    reader.readAsDataURL(file);
+  const handleBuyAgain = () => {
+    (order.items || []).forEach((item) => {
+      addToCart(item, item.quantity || 1);
+    });
+    setIsCartOpen(true);
   };
 
-  const handleResubmitSubmit = (e) => {
-    e.preventDefault();
-    if (!newTransactionId.trim() || !newScreenshot) {
-      alert('Please provide UTR number and upload new payment screenshot receipt.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setTimeout(() => {
-      resubmitOrderPaymentProof(order.id, {
-        transactionId: newTransactionId.trim(),
-        paymentScreenshot: newScreenshot
-      });
-      setIsSubmitting(false);
-      setShowResubmitModal(false);
-    }, 1000);
+  // Determine current timeline progress index
+  const getStageIndex = (statusStr = '') => {
+    const s = statusStr.toLowerCase();
+    if (s.includes('delivered')) return 6;
+    if (s.includes('out for delivery')) return 5;
+    if (s.includes('shipped')) return 4;
+    if (s.includes('packed') || s.includes('packing')) return 3;
+    if (s.includes('printing')) return 2;
+    if (s.includes('verified') || s.includes('paid')) return 1;
+    return 0; // Placed
   };
 
-  const hasCourierAssigned = Boolean(order.courierName || order.trackingNumber);
-  const hasTrackingUrl = Boolean(order.courierWebsite);
-  const isPaymentPending = order.paymentStatus === 'Verification Pending';
-  const isPaymentRejected = order.paymentStatus === 'Rejected' || order.paymentStatus === 'Screenshot Required';
+  const currentStageIdx = getStageIndex(order.status);
 
   return (
     <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden transition hover:shadow-md">
@@ -107,19 +98,17 @@ export default function OrderCard({ order }) {
             <span className="text-slate-400">•</span>
             <span className="text-slate-500">{new Date(order.createdAt).toLocaleDateString()}</span>
           </div>
-          <p className="text-[11px] text-slate-500 font-medium">
-            UTR: <strong className="text-emerald-700 font-mono font-bold">{order.transactionId || 'Pending'}</strong>
-          </p>
+          {order.razorpayPaymentId && (
+            <p className="text-[11px] text-slate-500 font-medium">
+              Razorpay Payment ID: <strong className="text-emerald-700 font-mono font-bold">{order.razorpayPaymentId}</strong>
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
-          <span className={`px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 ${
-            order.paymentStatus === 'Paid' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
-            isPaymentRejected ? 'bg-rose-100 text-rose-800 border border-rose-300' :
-            'bg-amber-100 text-amber-800 border border-amber-300'
-          }`}>
-            <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
-            <span>{order.status || 'Payment Verification Pending'}</span>
+          <span className="px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-full text-xs font-extrabold flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>{order.status || 'Payment Verified'}</span>
           </span>
 
           <span className="font-black text-slate-900 text-sm sm:text-base">
@@ -129,47 +118,41 @@ export default function OrderCard({ order }) {
       </div>
 
       {/* Main Body */}
-      <div className="p-4 sm:p-6 space-y-5">
+      <div className="p-4 sm:p-6 space-y-6">
         
-        {/* Verification Pending Alert Banner */}
-        {isPaymentPending && (
-          <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs space-y-1 flex items-start gap-3">
-            <Clock size={20} className="text-amber-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-extrabold text-amber-900">Payment Verification Pending</p>
-              <p className="text-amber-800 font-medium leading-relaxed">
-                "Your payment is under verification. We will verify your payment and start processing your order."
-              </p>
-            </div>
+        {/* Amazon-Style Order Timeline Bar */}
+        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+          <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-400">Order Progress Timeline</h4>
+          <div className="grid grid-cols-7 gap-1 relative">
+            {TIMELINE_STAGES.map((stage, idx) => {
+              const isPassed = idx <= currentStageIdx;
+              const isCurrent = idx === currentStageIdx;
+              return (
+                <div key={stage.id} className="flex flex-col items-center text-center space-y-1 relative">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black z-10 transition ${
+                      isPassed
+                        ? 'bg-emerald-600 text-white shadow-md'
+                        : 'bg-slate-200 text-slate-400'
+                    } ${isCurrent ? 'ring-4 ring-emerald-200' : ''}`}
+                  >
+                    {isPassed ? <Check size={12} /> : idx + 1}
+                  </div>
+                  <span className={`text-[9px] font-bold leading-tight ${isPassed ? 'text-slate-900' : 'text-slate-400'}`}>
+                    {stage.label}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-        )}
+        </div>
 
-        {/* Rejection Alert Banner with Resubmit Action */}
-        {isPaymentRejected && (
-          <div className="p-4 bg-rose-50 border border-rose-200 text-rose-900 rounded-2xl text-xs space-y-3">
-            <div className="flex items-start gap-3">
-              <AlertTriangle size={20} className="text-rose-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-extrabold text-rose-900">Payment Proof Rejected / New Screenshot Required</p>
-                <p className="text-rose-700 font-medium">{order.rejectionReason || 'Please upload a clear screenshot of your completed UPI payment receipt.'}</p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowResubmitModal(true)}
-              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-xs shadow-md transition inline-block"
-            >
-              Upload New Payment Screenshot / UTR
-            </button>
-          </div>
-        )}
-
-        {/* Order Items Gallery */}
+        {/* Order Items List */}
         <div className="space-y-3">
           {(order.items || []).map((item) => (
             <div key={item.id} className="flex items-center gap-4 py-2 border-b border-slate-100 last:border-b-0">
               <img
-                src={item.images?.[0] || 'https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&q=80&w=300'}
+                src={item.images?.[0] || '/images/juke_heat_press_16x24.png'}
                 alt={item.name}
                 className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shrink-0"
               />
@@ -184,80 +167,34 @@ export default function OrderCard({ order }) {
           ))}
         </div>
 
-        {/* Action CTAs */}
+        {/* Action CTAs: Download Invoice, Buy Again, View Status */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
-          <button
-            onClick={generatePDFInvoice}
-            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold rounded-2xl transition flex items-center gap-2"
-          >
-            <FileText size={15} /> Download Tax Invoice PDF
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={generatePDFInvoice}
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold rounded-2xl transition flex items-center gap-2"
+            >
+              <FileText size={15} /> Invoice PDF
+            </button>
+
+            <button
+              onClick={handleBuyAgain}
+              className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black rounded-2xl transition flex items-center gap-2 shadow-md"
+            >
+              <RefreshCw size={14} /> Buy Again
+            </button>
+          </div>
 
           <Link
             href={`/track-order/${order.id}`}
             className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-2xl transition shadow-md flex items-center gap-1.5"
           >
-            <span>View Live Order Status</span>
+            <span>Track Order</span>
             <ChevronRight size={16} />
           </Link>
         </div>
 
       </div>
-
-      {/* RESUBMIT PAYMENT PROOF MODAL */}
-      {showResubmitModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md" onClick={() => setShowResubmitModal(false)} />
-
-          <div className="relative max-w-md w-full bg-white rounded-3xl p-6 shadow-2xl z-10 text-slate-900 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <h3 className="font-black text-sm text-slate-900">Resubmit Payment Proof for Order #{order.id}</h3>
-              <button onClick={() => setShowResubmitModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleResubmitSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">12-Digit UPI Transaction ID / UTR *</label>
-                <input
-                  type="text"
-                  required
-                  value={newTransactionId}
-                  onChange={(e) => setNewTransactionId(e.target.value)}
-                  placeholder="e.g. 421589012345"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 font-mono font-bold text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">New Payment Screenshot *</label>
-                <div className="border-2 border-dashed border-slate-300 rounded-2xl p-4 text-center bg-slate-50">
-                  {newScreenshot ? (
-                    <img src={newScreenshot} alt="Receipt" className="w-28 h-36 object-cover rounded-xl mx-auto border" />
-                  ) : (
-                    <>
-                      <Upload size={24} className="mx-auto text-emerald-600 mb-1" />
-                      <input type="file" required accept="image/*" onChange={handleScreenshotUpload} className="hidden" id="resubmit-file" />
-                      <label htmlFor="resubmit-file" className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold cursor-pointer inline-block">
-                        Choose Image File
-                      </label>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting || !newTransactionId.trim() || !newScreenshot}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md transition"
-              >
-                {isSubmitting ? 'Submitting New Proof...' : 'Resubmit Payment Proof'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
 
     </div>
   );
