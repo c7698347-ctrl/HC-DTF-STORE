@@ -5,13 +5,12 @@ import { useSearchParams } from 'next/navigation';
 import { SlidersHorizontal, Search, RefreshCw, Package } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import ProductCard from '@/components/product/ProductCard';
-import { DEFAULT_CATEGORIES } from '@/lib/store';
 
 function ShopContent() {
   const searchParams = useSearchParams();
-  const { products, t } = useStore();
+  const { products = [], categories = [] } = useStore();
 
-  const [selectedCatId, setSelectedCatId] = useState('');
+  const [selectedCatName, setSelectedCatName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('featured');
   const [inStockOnly, setInStockOnly] = useState(false);
@@ -20,35 +19,44 @@ function ShopContent() {
     const cat = searchParams.get('cat');
     const search = searchParams.get('search');
 
-    if (cat) {
-      // Find matching default category ID or name case-insensitively
-      const target = DEFAULT_CATEGORIES.find(
-        (c) => c.id === cat || c.name.toLowerCase() === cat.toLowerCase() || c.slug === cat.toLowerCase()
-      );
-      if (target) {
-        setSelectedCatId(target.id);
-      }
-    }
+    if (cat) setSelectedCatName(cat);
     if (search) setSearchQuery(search);
   }, [searchParams]);
 
-  // Filtering logic strictly matching published products
+  // SINGLE UNIFIED REPOSITORY FILTERING LOGIC
   let filtered = products.filter((p) => {
-    // Hide drafts if status is set to Draft
+    // Hide drafts or disabled products
     if (p.status === 'Draft' || p.enabled === false) return false;
 
-    // Filter by Category ID (Case-insensitive matching)
-    if (selectedCatId) {
-      const matchCatId = p.categoryId === selectedCatId;
-      const targetCat = DEFAULT_CATEGORIES.find(c => c.id === selectedCatId);
-      const matchCatName = targetCat && p.category?.toLowerCase() === targetCat.name.toLowerCase();
-      if (!matchCatId && !matchCatName) return false;
+    // Filter by Category if selected
+    if (selectedCatName) {
+      const targetCatLower = selectedCatName.trim().toLowerCase();
+
+      if (targetCatLower === 'new arrivals' || targetCatLower === 'new-arrivals') {
+        // Include new arrival marked items or standard catalog items
+      } else if (targetCatLower === 'trending' || targetCatLower === 'trending products') {
+        if (p.isTrending === false) return false;
+      } else if (targetCatLower === 'best sellers' || targetCatLower === 'best-sellers') {
+        if (p.isBestSeller === false && (p.rating || 5) < 4.5) return false;
+      } else if (targetCatLower.includes('heat press')) {
+        const isHeatPress = p.categoryId === 'cat-heatpress' || 
+          p.category === 'HEAT PRESS MACHINES' || 
+          p.name?.toLowerCase().includes('heat press');
+        if (!isHeatPress) return false;
+      } else {
+        // Robust case-insensitive & partial matching
+        const matchId = p.categoryId?.toLowerCase() === targetCatLower;
+        const matchName = p.category?.toLowerCase() === targetCatLower;
+        const matchPartial = p.category?.toLowerCase().includes(targetCatLower) || targetCatLower.includes(p.category?.toLowerCase() || '');
+        
+        if (!matchId && !matchName && !matchPartial) return false;
+      }
     }
 
     // Filter by Stock
     if (inStockOnly && (p.stock || 0) <= 0) return false;
 
-    // Search Engine: Product Name, Tags Array, Description, Category
+    // Filter by Search Query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       const matchName = p.name?.toLowerCase().includes(q);
@@ -71,13 +79,28 @@ function ShopContent() {
   }
 
   const resetFilters = () => {
-    setSelectedCatId('');
+    setSelectedCatName('');
     setSearchQuery('');
     setSortBy('featured');
     setInStockOnly(false);
   };
 
-  const activeCategoryObj = DEFAULT_CATEGORIES.find(c => c.id === selectedCatId);
+  // Combine dynamic categories and defaults into one dropdown list
+  const allCategoryNames = Array.from(
+    new Set([
+      'HEAT PRESS MACHINES',
+      "Women's Collection",
+      "Men's Collection",
+      "Kids Collection",
+      'Festival Collection',
+      'Custom Printing',
+      'Saree Borders',
+      'Blouse Designs',
+      'Neck Designs',
+      ...categories.map(c => c.name),
+      ...products.map(p => p.category).filter(Boolean)
+    ])
+  );
 
   return (
     <div className="py-10 bg-slate-50 min-h-screen">
@@ -87,10 +110,10 @@ function ShopContent() {
         <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-slate-900 text-white rounded-3xl p-8 shadow-xl relative overflow-hidden">
           <div className="relative z-10 space-y-2">
             <h1 className="text-3xl sm:text-5xl font-black tracking-tight">
-              {activeCategoryObj ? activeCategoryObj.name : 'Explore All DTF Products'}
+              {selectedCatName ? selectedCatName : 'Explore All DTF Products'}
             </h1>
             <p className="text-xs sm:text-sm text-emerald-200">
-              {activeCategoryObj ? activeCategoryObj.description : 'Factory direct 1 Meter sheets, maggam blouse prints, zari borders & stickers'}
+              Factory direct 1 Meter sheets, maggam blouse prints, zari borders, stickers & JUKE machinery
             </p>
           </div>
         </div>
@@ -112,22 +135,22 @@ function ShopContent() {
               </button>
             </div>
 
-            {/* Default System Categories Selector */}
+            {/* Category Dropdown */}
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Default Category</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Category</label>
               <select
-                value={selectedCatId}
-                onChange={(e) => setSelectedCatId(e.target.value)}
+                value={selectedCatName}
+                onChange={(e) => setSelectedCatName(e.target.value)}
                 className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-800 font-extrabold focus:outline-none focus:border-emerald-500"
               >
                 <option value="">All Categories ({products.length})</option>
-                {DEFAULT_CATEGORIES.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                {allCategoryNames.map((name) => (
+                  <option key={name} value={name}>{name}</option>
                 ))}
               </select>
             </div>
 
-            {/* Instant Live Search Input */}
+            {/* Instant Search */}
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Instant Search</label>
               <div className="relative">
@@ -186,13 +209,13 @@ function ShopContent() {
             {filtered.length === 0 ? (
               <div className="bg-white rounded-3xl p-12 text-center space-y-4 border border-slate-200">
                 <Package size={40} className="mx-auto text-slate-400" />
-                <p className="text-base font-bold text-slate-800">No products available in this category yet.</p>
-                <p className="text-xs text-slate-500">Products uploaded by admin will appear here automatically.</p>
+                <p className="text-base font-bold text-slate-800">No products matching the selected category.</p>
+                <p className="text-xs text-slate-500">Click below to view all available factory direct products.</p>
                 <button
                   onClick={resetFilters}
                   className="px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-emerald-700 transition"
                 >
-                  Clear Search & Filters
+                  Show All Products ({products.length})
                 </button>
               </div>
             ) : (
