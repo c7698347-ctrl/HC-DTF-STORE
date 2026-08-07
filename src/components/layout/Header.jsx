@@ -23,7 +23,8 @@ import {
   Home as HomeIcon,
   Tag,
   Upload,
-  Clock
+  Clock,
+  Wrench
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import { LANGUAGES } from '@/lib/i18n';
@@ -324,7 +325,7 @@ export default function Header() {
         </div>
       </nav>
 
-      {/* SIDE MENU DRAWER (CATEGORIES ONLY EXIST HERE) */}
+      {/* SIDE MENU DRAWER (DTF CATEGORIES & HEAT PRESS MACHINES) */}
       {isDrawerMenuOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden">
           <div 
@@ -343,7 +344,7 @@ export default function Header() {
                   </div>
                   <div>
                     <h3 className="font-extrabold text-sm text-white">HC DTF STORE</h3>
-                    <p className="text-[10px] text-slate-400">Premium DTF Printing</p>
+                    <p className="text-[10px] text-slate-400">Premium DTF Transfers & Machinery</p>
                   </div>
                 </div>
                 <button
@@ -357,10 +358,10 @@ export default function Header() {
               {/* Drawer Category Navigation List */}
               <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs font-bold text-slate-800">
                 
-                {/* Main Navigation */}
+                {/* DTF Transfer Collections */}
                 <div className="space-y-1">
                   <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider px-3 block mb-1">
-                    Store Categories
+                    DTF Transfer Collections
                   </span>
 
                   {categories.map((cat) => (
@@ -368,9 +369,17 @@ export default function Header() {
                       key={cat.id}
                       href={`/shop?cat=${encodeURIComponent(cat.name)}`}
                       onClick={() => setIsDrawerMenuOpen(false)}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-emerald-50 hover:text-emerald-700 transition"
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-2xl transition ${
+                        cat.name === 'HEAT PRESS MACHINES'
+                          ? 'bg-slate-900 text-white hover:bg-slate-800 font-black mt-2'
+                          : 'hover:bg-emerald-50 hover:text-emerald-700'
+                      }`}
                     >
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      {cat.name === 'HEAT PRESS MACHINES' ? (
+                        <Wrench size={16} className="text-emerald-400" />
+                      ) : (
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      )}
                       <span>{cat.name}</span>
                     </Link>
                   ))}
@@ -379,7 +388,7 @@ export default function Header() {
                 {/* Account & Orders */}
                 <div className="pt-3 border-t border-slate-100 space-y-1">
                   <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider px-3 block mb-1">
-                    Account & Orders
+                    Quick Navigation
                   </span>
 
                   <Link href="/shop?filter=bestseller" onClick={() => setIsDrawerMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-emerald-50 hover:text-emerald-700 transition">
