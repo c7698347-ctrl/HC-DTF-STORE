@@ -17,14 +17,23 @@ import {
   Copy,
   Check,
   Clock,
-  X
+  ExternalLink,
+  Smartphone
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import jsPDF from 'jspdf';
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, createOrder, customerUser, setIsAuthOpen, addSavedAddress, settings } = useStore();
+  const { 
+    cart, 
+    createOrder, 
+    customerUser, 
+    setIsAuthOpen, 
+    addSavedAddress, 
+    settings,
+    getShippingFeeForState 
+  } = useStore();
 
   // Selected Saved Address vs Custom Address Entry
   const [selectedAddressId, setSelectedAddressId] = useState(customerUser?.addresses?.[0]?.id || 'new');
@@ -58,11 +67,23 @@ export default function CheckoutPage() {
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [createdOrderData, setCreatedOrderData] = useState(null);
 
+  // Automatic State-Wise Shipping Fee Calculation
+  const shippingFee = getShippingFeeForState(state);
+
   // Financial calculations
   const subtotal = cart.reduce((acc, item) => acc + (item.offerPrice || item.price) * item.quantity, 0);
-  const gstAmount = Number((subtotal * 0.18).toFixed(2));
-  const shippingFee = subtotal > (settings.freeShippingAbove || 999) ? 0 : (settings.shippingCharges || 70);
-  const grandTotal = Number((subtotal + gstAmount + shippingFee - appliedDiscount).toFixed(2));
+  const couponDiscount = appliedDiscount;
+  const taxableTotal = Math.max(0, subtotal - couponDiscount);
+  const gstAmount = Number((taxableTotal * 0.18).toFixed(2));
+  const grandTotal = Number((taxableTotal + gstAmount + shippingFee).toFixed(2));
+
+  // Dynamic UPI Deep Link & Dynamic QR Code (Exact Amount Prefilled)
+  const officialUpiId = settings.upiId || 'sunillankapalli77@okhdfcbank';
+  const merchantName = settings.upiAccountName || 'Sunil Kumar';
+  const orderRefNote = `Order payment for ${cart.length} item(s)`;
+  
+  const upiDeepLinkUri = `upi://pay?pa=${encodeURIComponent(officialUpiId)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal.toFixed(2)}&tn=${encodeURIComponent(orderRefNote)}&cu=INR`;
+  const dynamicQrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiDeepLinkUri)}`;
 
   const handleSelectSavedAddress = (addr) => {
     setSelectedAddressId(addr.id);
@@ -75,7 +96,7 @@ export default function CheckoutPage() {
     setLandmark(addr.landmark || '');
     setCity(addr.city || '');
     setDistrict(addr.district || '');
-    setState(addr.state || '');
+    setState(addr.state || 'Telangana');
     setPincode(addr.pincode || '');
   };
 
@@ -91,8 +112,7 @@ export default function CheckoutPage() {
   };
 
   const handleCopyUpi = () => {
-    const upiStr = settings.upiId || 'sunillankapalli77@okhdfcbank';
-    navigator.clipboard.writeText(upiStr);
+    navigator.clipboard.writeText(officialUpiId);
     setCopiedUpi(true);
     setTimeout(() => setCopiedUpi(false), 2000);
   };
@@ -148,9 +168,9 @@ export default function CheckoutPage() {
     y += 6;
     doc.text(`Subtotal: Rs.${subtotal}`, 14, y);
     y += 6;
-    doc.text(`GST (18%): Rs.${gstAmount}`, 14, y);
+    doc.text(`State Delivery Charge (${state}): Rs.${shippingFee}`, 14, y);
     y += 6;
-    doc.text(`Shipping Fee: Rs.${shippingFee}`, 14, y);
+    doc.text(`GST (18%): Rs.${gstAmount}`, 14, y);
     y += 6;
     doc.text(`Discount: -Rs.${appliedDiscount}`, 14, y);
     y += 8;
@@ -200,6 +220,7 @@ export default function CheckoutPage() {
         customerEmail: email,
         customerPhone: mobile,
         address: fullAddressFormatted,
+        shippingState: state,
         items: cart,
         subtotal,
         gst: gstAmount,
@@ -288,7 +309,7 @@ export default function CheckoutPage() {
 
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-left text-xs space-y-2">
             <div className="flex justify-between border-b border-slate-200 pb-2">
-              <span className="text-slate-500 font-medium">Order Total Amount:</span>
+              <span className="text-slate-500 font-medium">Grand Total Amount Paid:</span>
               <strong className="text-slate-900 font-black">₹{createdOrderData.total?.toLocaleString()}</strong>
             </div>
             <div className="flex justify-between border-b border-slate-200 pb-2">
@@ -329,16 +350,16 @@ export default function CheckoutPage() {
         <div className="border-b border-slate-200 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-3xl font-black text-slate-900">Manual UPI Express Checkout</h1>
-            <p className="text-xs text-slate-500 mt-1">Direct Factory Order • Manual UPI Transfer • 18% GST Invoice</p>
+            <p className="text-xs text-slate-500 mt-1">Direct Factory Order • State-Wise Delivery • 18% GST Invoice</p>
           </div>
 
           <div className="flex items-center gap-2 text-xs font-bold">
             <span className={`px-3 py-1.5 rounded-full ${step === 1 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-              1. Address & Policy
+              1. Address & State Delivery
             </span>
             <span className="text-slate-400">→</span>
             <span className={`px-3 py-1.5 rounded-full ${step === 2 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-              2. Official UPI & Verification Proof
+              2. Auto-Prefilled UPI & Verification
             </span>
           </div>
         </div>
@@ -499,15 +520,24 @@ export default function CheckoutPage() {
                     />
                   </div>
 
+                  {/* 10. State Selector (Triggers Live Delivery Charge Calculation) */}
                   <div>
-                    <label className="block text-slate-700 font-bold mb-1">State *</label>
-                    <input
-                      type="text"
-                      required
+                    <label className="block text-slate-700 font-bold mb-1">State (Auto-Calculates Delivery Charge) *</label>
+                    <select
                       value={state}
                       onChange={(e) => setState(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500"
-                    />
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 font-bold text-slate-900"
+                    >
+                      <option value="Andhra Pradesh">Andhra Pradesh (Delivery: ₹150)</option>
+                      <option value="Telangana">Telangana (Delivery: ₹150)</option>
+                      <option value="Tamil Nadu">Tamil Nadu (Delivery: ₹180)</option>
+                      <option value="Karnataka">Karnataka (Delivery: ₹180)</option>
+                      <option value="Kerala">Kerala (Delivery: ₹200)</option>
+                      <option value="Maharashtra">Maharashtra (Delivery: ₹200)</option>
+                      <option value="Delhi">Delhi (Delivery: ₹200)</option>
+                      <option value="Gujarat">Gujarat (Delivery: ₹200)</option>
+                      <option value="Other States">Other States (Delivery: ₹200)</option>
+                    </select>
                   </div>
 
                   <div>
@@ -549,17 +579,17 @@ export default function CheckoutPage() {
                     : 'bg-slate-300 text-slate-500 cursor-not-allowed'
                 }`}
               >
-                <span>Proceed to Official Payment Details</span>
+                <span>Proceed to Auto-Prefilled Payment Details</span>
                 <ArrowRight size={18} />
               </button>
 
             </div>
 
-            {/* Right Summary */}
+            {/* Right Summary Breakdown */}
             <div className="lg:col-span-5 space-y-6">
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 sticky top-24">
                 <h3 className="text-xs font-extrabold uppercase text-slate-900 tracking-wider">
-                  Order Summary ({cart.reduce((a, b) => a + b.quantity, 0)} Items)
+                  Complete Order Summary ({cart.reduce((a, b) => a + b.quantity, 0)} Items)
                 </h3>
 
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1 text-xs">
@@ -574,21 +604,32 @@ export default function CheckoutPage() {
                   ))}
                 </div>
 
+                {/* 8. COMPLETE ORDER SUMMARY DISPLAY */}
                 <div className="space-y-2 text-xs border-t border-slate-200 pt-3 text-slate-600">
                   <div className="flex justify-between">
-                    <span>Subtotal</span>
+                    <span>Products Subtotal</span>
                     <span className="font-bold text-slate-900">₹{subtotal.toLocaleString()}</span>
                   </div>
+
+                  <div className="flex justify-between text-emerald-700 font-bold">
+                    <span>State Delivery Charge ({state})</span>
+                    <span>{shippingFee === 0 ? 'FREE' : `₹${shippingFee}`}</span>
+                  </div>
+
+                  {appliedDiscount > 0 && (
+                    <div className="flex justify-between text-emerald-600 font-bold">
+                      <span>Discount</span>
+                      <span>-₹{appliedDiscount}</span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between">
-                    <span>GST (18%)</span>
+                    <span>GST (18% Factory Tax)</span>
                     <span className="font-bold text-slate-900">₹{gstAmount.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Express Shipping</span>
-                    <span className="font-bold text-emerald-600">{shippingFee === 0 ? 'FREE' : `₹${shippingFee}`}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-slate-200 pt-3 text-sm font-black text-slate-900">
-                    <span>Total Amount Payable</span>
+
+                  <div className="flex justify-between border-t border-slate-200 pt-3 text-base font-black text-slate-900">
+                    <span>Grand Total Amount</span>
                     <span className="text-emerald-700">₹{grandTotal.toLocaleString()}</span>
                   </div>
                 </div>
@@ -598,11 +639,11 @@ export default function CheckoutPage() {
           </form>
         )}
 
-        {/* STEP 2: OFFICIAL UPI PAYMENT & PROOF SUBMISSION */}
+        {/* STEP 2: AUTO-PREFILLED DYNAMIC UPI PAYMENT & VERIFICATION PROOF */}
         {step === 2 && (
           <form onSubmit={handleFinalOrderSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
-            {/* Left Column: Official Store UPI Details & Real Google Pay QR Code */}
+            {/* Left Column: Official Store UPI Details & Dynamic QR Code */}
             <div className="lg:col-span-6 space-y-6">
               
               <div className="bg-slate-900 text-white p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-2xl space-y-6">
@@ -610,9 +651,9 @@ export default function CheckoutPage() {
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                   <div>
                     <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider bg-emerald-950 px-2.5 py-1 rounded border border-emerald-500/30">
-                      Official Store Account
+                      Official Account
                     </span>
-                    <h3 className="text-xl font-black text-white mt-1">Manual UPI Payment Details</h3>
+                    <h3 className="text-xl font-black text-white mt-1">Auto-Prefilled UPI Payment</h3>
                   </div>
                   <button type="button" onClick={() => setStep(1)} className="text-xs text-slate-400 hover:text-white underline">
                     ← Edit Address
@@ -624,7 +665,7 @@ export default function CheckoutPage() {
                   
                   <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                     <span className="text-slate-400 font-bold">Account Name:</span>
-                    <strong className="text-white font-extrabold text-sm">{settings.upiAccountName || 'Sunil Kumar'}</strong>
+                    <strong className="text-white font-extrabold text-sm">{merchantName}</strong>
                   </div>
 
                   <div className="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -635,7 +676,7 @@ export default function CheckoutPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-slate-400 font-bold">Official UPI ID:</span>
                     <div className="flex items-center gap-2">
-                      <strong className="text-emerald-400 font-mono font-black text-sm">{settings.upiId || 'sunillankapalli77@okhdfcbank'}</strong>
+                      <strong className="text-emerald-400 font-mono font-black text-sm">{officialUpiId}</strong>
                       <button
                         type="button"
                         onClick={handleCopyUpi}
@@ -649,24 +690,33 @@ export default function CheckoutPage() {
 
                 </div>
 
-                {/* Official Google Pay QR Code Display */}
+                {/* 4. DYNAMIC PREFILLED AMOUNT UPI QR CODE & DIRECT PAY BUTTON */}
                 <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 text-center space-y-4">
-                  <p className="text-xs font-extrabold text-white">Scan & Pay via Google Pay, PhonePe, Paytm, or BHIM</p>
-                  
+                  <p className="text-xs font-extrabold text-emerald-400">
+                    Scan below or tap button — Amount ₹{grandTotal.toFixed(2)} is automatically prefilled!
+                  </p>
+
+                  {/* Dynamic QR Code containing exact amount */}
                   <div className="bg-white p-3 rounded-2xl inline-block shadow-2xl border border-slate-200">
                     <img
-                      src={settings.upiQrCodeUrl || '/gpay-qr.png'}
-                      alt="Official Google Pay QR Code - Sunil Kumar"
+                      src={dynamicQrCodeUrl}
+                      alt={`Dynamic UPI QR Code for ₹${grandTotal}`}
                       className="w-64 sm:w-72 h-auto max-w-full mx-auto rounded-xl object-contain shadow-md"
                     />
                   </div>
 
-                  <div className="pt-1 space-y-1">
-                    <p className="text-base font-black text-emerald-400">
-                      Amount Payable: ₹{grandTotal.toLocaleString()}
-                    </p>
-                    <p className="text-[11px] text-slate-400 font-medium">
-                      UPI ID: <span className="font-mono text-slate-200">{settings.upiId || 'sunillankapalli77@okhdfcbank'}</span>
+                  {/* Direct Launch Button for Mobile UPI Apps */}
+                  <div className="pt-2">
+                    <a
+                      href={upiDeepLinkUri}
+                      className="w-full py-4 bg-gradient-to-r from-emerald-600 to-emerald-800 hover:from-emerald-500 hover:to-emerald-700 text-white font-black rounded-2xl text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition"
+                    >
+                      <Smartphone size={18} />
+                      <span>Tap to Pay ₹{grandTotal.toFixed(2)} in Google Pay / PhonePe / Paytm</span>
+                      <ExternalLink size={16} />
+                    </a>
+                    <p className="text-[11px] text-slate-400 mt-2 font-medium">
+                      No manual amount typing required. The app will open directly with ₹{grandTotal.toFixed(2)}.
                     </p>
                   </div>
                 </div>
@@ -762,13 +812,13 @@ export default function CheckoutPage() {
                 >
                   <Lock size={16} />
                   <span>
-                    {isSubmittingOrder ? 'Submitting Payment Proof...' : `Submit Payment Proof & Place Order (₹${grandTotal.toLocaleString()})`}
+                    {isSubmittingOrder ? 'Submitting Payment Proof...' : `Submit Payment Proof & Place Order (₹${grandTotal.toFixed(2)})`}
                   </span>
                   <ArrowRight size={16} />
                 </button>
 
                 <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-[11px] text-amber-800 font-medium leading-relaxed">
-                  <strong>Verification Note:</strong> Your order will be set to <em>Payment Verification Pending</em>. Account details belong to <strong>Sunil Kumar</strong>. Our team will verify your UTR and confirm your order.
+                  <strong>Verification Note:</strong> Order status will be set to <em>Payment Verification Pending</em>. Account details belong to <strong>{merchantName}</strong>. Our team will verify your UTR and confirm your order.
                 </div>
 
               </div>

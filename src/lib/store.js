@@ -61,12 +61,34 @@ export const INITIAL_FLASH_SALE = {
   history: []
 };
 
+export const STATE_SHIPPING_RATES = {
+  'Andhra Pradesh': 150,
+  'Telangana': 150,
+  'Tamil Nadu': 180,
+  'Karnataka': 180,
+  'Kerala': 200,
+  'Other States': 200
+};
+
+export const getShippingChargeForState = (stateName, stateRatesMap = STATE_SHIPPING_RATES) => {
+  if (!stateName) return 150;
+  const cleanState = stateName.trim().toLowerCase();
+  const rates = stateRatesMap || STATE_SHIPPING_RATES;
+  if (cleanState.includes('andhra')) return Number(rates['Andhra Pradesh']) || 150;
+  if (cleanState.includes('telangana')) return Number(rates['Telangana']) || 150;
+  if (cleanState.includes('tamil')) return Number(rates['Tamil Nadu']) || 180;
+  if (cleanState.includes('karnataka')) return Number(rates['Karnataka']) || 180;
+  if (cleanState.includes('kerala')) return Number(rates['Kerala']) || 200;
+  return Number(rates['Other States']) || 200;
+};
+
 export const INITIAL_SETTINGS = {
   storeName: 'HC DTF STORE',
   logoUrl: '',
   gstNumber: '36ABCDE1234F1Z5',
-  shippingCharges: 70,
+  shippingCharges: 150,
   freeShippingAbove: 999,
+  stateShippingRates: STATE_SHIPPING_RATES,
   whatsappNumber: '+918121635407',
   phone: '+91 8121635407',
   email: 'support@hcdtfstore.com',
@@ -95,5 +117,5 @@ export const INITIAL_ORDERS = [];
 export const DEFAULT_ADMIN = {
   email: 'admin@hcdtfstore.com',
   passwordHash: '$2a$10$wS9X9pQ1.9lE5.q9q.G.O.yH.cK49e9uW7tS9.W9.q9.W9.q9',
-  mustChangePassword: true
+  mustChangePassword: false
 };

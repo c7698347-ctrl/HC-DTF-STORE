@@ -12,7 +12,8 @@ import {
   ArrowRight, 
   Tag, 
   Check, 
-  ShieldCheck
+  ShieldCheck,
+  Truck
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
@@ -25,7 +26,9 @@ export default function CartDrawer() {
     removeFromCart, 
     updateCartQuantity,
     moveToBuyLater,
-    t 
+    t,
+    settings,
+    getShippingFeeForState
   } = useStore();
 
   const [appliedCoupon, setAppliedCoupon] = useState(null);
@@ -44,8 +47,8 @@ export default function CartDrawer() {
   const couponDiscount = appliedCoupon ? Math.round((cartSubtotal * (Number(appliedCoupon.percent) || 0)) / 100) : 0;
   const taxableTotal = Math.max(0, cartSubtotal - couponDiscount);
   const gstAmount = Math.round(taxableTotal * 0.18);
-  const shippingFee = cartSubtotal > 999 || cartSubtotal === 0 ? 0 : 70;
-  const cartTotal = taxableTotal + gstAmount + shippingFee;
+  const estimatedShipping = cartSubtotal > (settings.freeShippingAbove || 999) || cartSubtotal === 0 ? 0 : 150;
+  const cartTotal = taxableTotal + gstAmount + estimatedShipping;
 
   if (!isCartOpen) return null;
 
@@ -252,19 +255,24 @@ export default function CartDrawer() {
                 )}
 
                 <div className="flex justify-between">
-                  <span>{t('gst')}</span>
+                  <span>GST (18% Factory Tax)</span>
                   <span className="font-semibold text-slate-900">₹{(gstAmount ?? 0).toLocaleString('en-IN')}</span>
                 </div>
 
                 <div className="flex justify-between">
-                  <span>{t('shipping')}</span>
-                  <span>{shippingFee === 0 ? <strong className="text-emerald-600 uppercase">FREE</strong> : `₹${shippingFee}`}</span>
+                  <span>State-Wise Shipping</span>
+                  <span>{estimatedShipping === 0 ? <strong className="text-emerald-600 uppercase">FREE</strong> : `From ₹${estimatedShipping}`}</span>
                 </div>
 
                 <div className="pt-2 border-t border-slate-200 flex justify-between text-sm font-black text-slate-900">
-                  <span>{t('total')}</span>
+                  <span>Estimated Total</span>
                   <span className="text-emerald-700 text-base">₹{(cartTotal ?? 0).toLocaleString('en-IN')}</span>
                 </div>
+              </div>
+
+              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[10px] text-slate-500 font-medium flex items-center gap-1.5">
+                <Truck size={14} className="text-emerald-600 shrink-0" />
+                <span>AP/TS: ₹150 | TN/KA: ₹180 | Kerala & Others: ₹200 (Auto-calculated on checkout)</span>
               </div>
 
               <button
@@ -274,13 +282,13 @@ export default function CartDrawer() {
                 }}
                 className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-800 text-white font-bold rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl shadow-emerald-700/20 hover:from-emerald-700 hover:to-emerald-900 transition duration-200"
               >
-                <span>{t('checkout')}</span>
+                <span>Proceed to Express Checkout</span>
                 <ArrowRight size={16} />
               </button>
 
               <div className="flex items-center justify-center gap-2 text-[11px] text-slate-500 pt-1">
                 <ShieldCheck size={14} className="text-emerald-600" />
-                <span>Encrypted 256-bit Secure Razorpay Checkout</span>
+                <span>Direct Factory Order • Manual UPI Express Checkout</span>
               </div>
             </div>
           )}

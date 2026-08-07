@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Smartphone, Mail, ArrowRight, ShieldCheck, RefreshCw, CheckCircle2, Loader2, KeyRound } from 'lucide-react';
+import { X, Smartphone, Mail, CheckCircle2, Loader2, KeyRound, RefreshCw } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
 export default function AuthModal() {
@@ -13,7 +13,6 @@ export default function AuthModal() {
   // OTP Step States
   const [step, setStep] = useState('input'); // 'input', 'otp'
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const [devOtpCode, setDevOtpCode] = useState('');
 
   // UI Statuses
   const [isLoading, setIsLoading] = useState(false);
@@ -47,7 +46,7 @@ export default function AuthModal() {
 
     const cleanIdent = identifier.trim();
     if (!cleanIdent) {
-      setErrorMsg(otpType === 'mobile' ? 'Please enter a valid 10-digit mobile number' : 'Please enter a valid email address');
+      setErrorMsg(otpType === 'mobile' ? 'Please enter your 10-digit mobile number' : 'Please enter a valid email address');
       return;
     }
 
@@ -65,9 +64,6 @@ export default function AuthModal() {
       setCountdown(30);
       setCanResend(false);
       setOtpDigits(['', '', '', '', '', '']);
-      if (res.devOtpCode) {
-        setDevOtpCode(res.devOtpCode);
-      }
       setTimeout(() => {
         digitRefs[0].current?.focus();
       }, 100);
@@ -95,12 +91,10 @@ export default function AuthModal() {
     newDigits[index] = value;
     setOtpDigits(newDigits);
 
-    // Auto-advance to next box
     if (value !== '' && index < 5) {
       digitRefs[index + 1].current?.focus();
     }
 
-    // Auto-verify when 6th digit is entered
     if (newDigits.every(d => d !== '') && value !== '') {
       handleVerifyOtp(newDigits.join(''));
     }
@@ -115,7 +109,7 @@ export default function AuthModal() {
   const handleVerifyOtp = async (codeToVerify) => {
     const fullCode = codeToVerify || otpDigits.join('');
     if (fullCode.length < 6) {
-      setErrorMsg('Please enter all 6 digits of the OTP code');
+      setErrorMsg('Please enter all 6 digits of the OTP code received via SMS');
       return;
     }
 
@@ -146,7 +140,7 @@ export default function AuthModal() {
     <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md" onClick={() => setIsAuthOpen(false)} />
 
-      <div className="relative w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 shadow-2xl z-10 border border-slate-100 space-y-6 animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 shadow-2xl z-10 border border-slate-100 space-y-6">
         
         <button
           onClick={() => setIsAuthOpen(false)}
@@ -161,12 +155,12 @@ export default function AuthModal() {
             HC
           </div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-            {step === 'input' ? 'Customer Sign In' : 'Verify OTP Code'}
+            {step === 'input' ? 'Customer Login' : 'Enter SMS OTP Code'}
           </h2>
           <p className="text-xs text-slate-500">
             {step === 'input' 
-              ? 'Login or create an account using 1-Click OTP Verification' 
-              : `Enter the 6-digit code sent to ${identifier}`}
+              ? 'Login or create account securely via SMS OTP' 
+              : `Enter 6-digit SMS OTP code sent to +91 ${identifier}`}
           </p>
         </div>
 
@@ -176,11 +170,10 @@ export default function AuthModal() {
           </div>
         )}
 
-        {/* STEP 1: SELECT TYPE & ENTER IDENTIFIER */}
+        {/* STEP 1: SELECT TYPE & ENTER MOBILE / EMAIL */}
         {step === 'input' && (
           <form onSubmit={handleSendOtp} className="space-y-5">
             
-            {/* Type Selector Tabs */}
             <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl">
               <button
                 type="button"
@@ -215,7 +208,7 @@ export default function AuthModal() {
               </button>
             </div>
 
-            {/* Input Field */}
+            {/* Mobile / Email Input */}
             {otpType === 'mobile' ? (
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">Mobile Number</label>
@@ -227,10 +220,10 @@ export default function AuthModal() {
                     type="tel"
                     required
                     maxLength={10}
-                    placeholder="98765 43210"
+                    placeholder="Enter your mobile number"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value.replace(/[^0-9]/g, ''))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-16 pr-4 py-3 text-xs font-bold tracking-wider text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-16 pr-4 py-3.5 text-xs font-bold tracking-wider text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white"
                   />
                 </div>
               </div>
@@ -241,10 +234,10 @@ export default function AuthModal() {
                   <input
                     type="email"
                     required
-                    placeholder="name@company.com"
+                    placeholder="Enter your email address"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-3.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white"
                   />
                   <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 </div>
@@ -253,16 +246,16 @@ export default function AuthModal() {
 
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition disabled:opacity-50"
+              disabled={isLoading || !identifier.trim()}
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-xs shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition disabled:opacity-50"
             >
               {isLoading ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" /> Dispatching OTP...
+                  <Loader2 size={16} className="animate-spin" /> Dispatching SMS OTP...
                 </>
               ) : (
                 <>
-                  <KeyRound size={16} /> Send 6-Digit OTP Code
+                  <KeyRound size={16} /> Send OTP via SMS
                 </>
               )}
             </button>
@@ -270,26 +263,18 @@ export default function AuthModal() {
           </form>
         )}
 
-        {/* STEP 2: ENTER & AUTO-VERIFY 6-DIGIT OTP */}
+        {/* STEP 2: ENTER 6-DIGIT OTP (NO FAKE DISPLAY) */}
         {step === 'otp' && (
           <div className="space-y-6">
 
-            {devOtpCode && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-2xl flex items-center justify-between">
-                <span>OTP Code: <strong className="text-emerald-700 tracking-widest font-black text-sm">{devOtpCode}</strong></span>
-                <span className="text-[10px] uppercase bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-extrabold">Active</span>
-              </div>
-            )}
-
             {isSuccess ? (
-              <div className="py-8 text-center space-y-2 animate-in zoom-in-95 duration-200">
+              <div className="py-8 text-center space-y-2">
                 <CheckCircle2 size={48} className="mx-auto text-emerald-500 animate-bounce" />
                 <h3 className="font-black text-slate-900 text-lg">OTP Verified!</h3>
-                <p className="text-xs text-slate-500">Logining into your account...</p>
+                <p className="text-xs text-slate-500">Signing into account...</p>
               </div>
             ) : (
               <>
-                {/* 6 Auto-Focused Digit Input Boxes */}
                 <div className="flex items-center justify-between gap-2">
                   {otpDigits.map((digit, idx) => (
                     <input
@@ -314,7 +299,7 @@ export default function AuthModal() {
                     }}
                     className="text-slate-500 hover:text-slate-800 font-bold"
                   >
-                    ← Change {otpType === 'mobile' ? 'Mobile' : 'Email'}
+                    ← Change Mobile Number
                   </button>
 
                   <button
@@ -325,16 +310,16 @@ export default function AuthModal() {
                     }`}
                   >
                     <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
-                    {canResend ? 'Resend OTP' : `Resend in ${countdown}s`}
+                    {canResend ? 'Resend SMS OTP' : `Resend in ${countdown}s`}
                   </button>
                 </div>
 
                 <button
                   onClick={() => handleVerifyOtp()}
                   disabled={isLoading || otpDigits.some(d => d === '')}
-                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition disabled:opacity-50"
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-xs shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition disabled:opacity-50"
                 >
-                  {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Verify & Sign In'}
+                  {isLoading ? <Loader2 size={16} className="animate-spin" /> : 'Verify OTP & Login'}
                 </button>
               </>
             )}

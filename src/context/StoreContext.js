@@ -10,7 +10,9 @@ import {
   INITIAL_ORDERS,
   INITIAL_FLASH_SALE,
   DEFAULT_ADMIN,
-  TRACKING_STAGES
+  TRACKING_STAGES,
+  STATE_SHIPPING_RATES,
+  getShippingChargeForState
 } from '@/lib/store';
 import { getTranslation, LANGUAGES } from '@/lib/i18n';
 
@@ -57,8 +59,17 @@ export function StoreProvider({ children }) {
   const couponDiscount = appliedCoupon ? Math.round((cartSubtotal * (Number(appliedCoupon.percent) || 0)) / 100) : 0;
   const taxableTotal = Math.max(0, cartSubtotal - couponDiscount);
   const gstAmount = Math.round(taxableTotal * 0.18);
-  const shippingFee = cartSubtotal > 999 || cartSubtotal === 0 ? 0 : 70;
-  const cartTotal = taxableTotal + gstAmount + shippingFee;
+
+  // State-Wise Shipping Fee Helper
+  const getShippingFeeForState = (stateName) => {
+    if (cartSubtotal === 0) return 0;
+    if (cartSubtotal > (settings.freeShippingAbove || 999)) return 0;
+    const ratesMap = settings.stateShippingRates || STATE_SHIPPING_RATES;
+    return getShippingChargeForState(stateName, ratesMap);
+  };
+
+  const defaultShippingFee = cartSubtotal > (settings.freeShippingAbove || 999) || cartSubtotal === 0 ? 0 : 150;
+  const cartTotal = taxableTotal + gstAmount + defaultShippingFee;
 
   // Fetch products from single database API (/api/products)
   const fetchProductsFromApi = async () => {
@@ -137,11 +148,11 @@ export function StoreProvider({ children }) {
         const session = {
           email: DEFAULT_ADMIN.email,
           role: 'ADMIN',
-          mustChangePassword: true
+          mustChangePassword: false
         };
         setAdminUser(session);
         localStorage.setItem('hc_dtf_admin_session', JSON.stringify(session));
-        return { success: true, mustChangePassword: true };
+        return { success: true, mustChangePassword: false };
       }
       
       const storedPass = localStorage.getItem('hc_dtf_admin_pass');
@@ -700,11 +711,12 @@ export function StoreProvider({ children }) {
         setIsAuthOpen,
         fetchProductsFromApi,
 
-        // Safe Calculated Financial Exports
+        // Safe Calculated Financial & Shipping Exports
         cartSubtotal,
         couponDiscount,
         gstAmount,
-        shippingFee,
+        shippingFee: defaultShippingFee,
+        getShippingFeeForState,
         cartTotal,
         appliedCoupon,
         setAppliedCoupon,
