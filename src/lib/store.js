@@ -390,7 +390,6 @@ export const getShippingChargeForState = (stateName, stateRatesMap = STATE_SHIPP
 export const INITIAL_SETTINGS = {
   storeName: 'HC DTF STORE',
   logoUrl: '',
-  gstNumber: '36ABCDE1234F1Z5',
   shippingCharges: 150,
   freeShippingAbove: 999,
   stateShippingRates: STATE_SHIPPING_RATES,

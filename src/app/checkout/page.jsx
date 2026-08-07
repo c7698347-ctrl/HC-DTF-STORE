@@ -1,44 +1,41 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
-  QrCode, 
   ShieldCheck, 
-  CheckCircle2, 
+  ShoppingBag, 
   ArrowRight, 
-  Lock, 
+  Check, 
+  Copy, 
+  QrCode, 
+  Upload, 
+  Truck, 
+  Clock, 
   AlertCircle,
-  PlusCircle,
-  MapPin,
-  KeyRound,
-  UserCheck,
-  Upload,
-  Copy,
-  Check,
-  Clock,
-  ExternalLink,
-  Smartphone
+  HelpCircle,
+  FileText,
+  MapPin
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { 
-    cart, 
-    createOrder, 
+    cart = [], 
+    clearCart, 
     customerUser, 
-    setIsAuthOpen, 
-    addSavedAddress, 
+    savedAddresses = [], 
+    addOrder,
     settings,
-    getShippingFeeForState 
+    getShippingFeeForState
   } = useStore();
 
-  // Selected Saved Address vs Custom Address Entry
-  const [selectedAddressId, setSelectedAddressId] = useState(customerUser?.addresses?.[0]?.id || 'new');
+  const [selectedAddressId, setSelectedAddressId] = useState('');
   
-  // Detailed Address Form Fields (Required)
+  // Shipping Form State
   const [fullName, setFullName] = useState(customerUser?.name || '');
   const [mobile, setMobile] = useState(customerUser?.phone || '');
   const [email, setEmail] = useState(customerUser?.email || '');
@@ -60,7 +57,7 @@ export default function CheckoutPage() {
   const [acceptedNoReturnPolicy, setAcceptedNoReturnPolicy] = useState(false);
 
   // Manual Prepaid UPI Payment Verification Inputs
-  const [step, setStep] = useState(1); // 1 = Address & Policy, 2 = Manual UPI Payment & Verification
+  const [step, setStep] = useState(1);
   const [transactionId, setTransactionId] = useState('');
   const [paymentScreenshot, setPaymentScreenshot] = useState('');
   const [copiedUpi, setCopiedUpi] = useState(false);
@@ -70,12 +67,11 @@ export default function CheckoutPage() {
   // Automatic State-Wise Shipping Fee Calculation
   const shippingFee = getShippingFeeForState(state);
 
-  // Financial calculations
+  // Financial calculations (NO GST)
   const subtotal = cart.reduce((acc, item) => acc + (item.offerPrice || item.price) * item.quantity, 0);
   const couponDiscount = appliedDiscount;
   const taxableTotal = Math.max(0, subtotal - couponDiscount);
-  const gstAmount = Number((taxableTotal * 0.18).toFixed(2));
-  const grandTotal = Number((taxableTotal + gstAmount + shippingFee).toFixed(2));
+  const grandTotal = Number((taxableTotal + shippingFee).toFixed(2));
 
   // Dynamic UPI Deep Link & Dynamic QR Code (Exact Amount Prefilled)
   const officialUpiId = settings.upiId || 'sunillankapalli77@okhdfcbank';
@@ -145,18 +141,17 @@ export default function CheckoutPage() {
   const generatePDFInvoice = (orderId, utrVal) => {
     const doc = new jsPDF();
     doc.setFontSize(18);
-    doc.text('HC DTF STORE - OFFICIAL TAX INVOICE', 14, 20);
+    doc.text('HC DTF STORE - OFFICIAL ORDER INVOICE', 14, 20);
     doc.setFontSize(10);
     doc.text(`Invoice ID: INV-${orderId}`, 14, 30);
     doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 36);
-    doc.text(`GSTIN: ${settings.gstNumber || '36ABCDE1234F1Z5'}`, 14, 42);
 
-    doc.text(`Customer Name: ${fullName}`, 14, 52);
-    doc.text(`Email / Mobile: ${email} | ${mobile}`, 14, 58);
-    doc.text(`Shipping Address: ${houseFlatNo}, ${street}, ${area}, ${city}, ${state} - ${pincode}`, 14, 64);
-    doc.text(`UPI UTR / Transaction ID: ${utrVal || 'Submitted (Verification Pending)'}`, 14, 70);
+    doc.text(`Customer Name: ${fullName}`, 14, 46);
+    doc.text(`Email / Mobile: ${email} | ${mobile}`, 14, 52);
+    doc.text(`Shipping Address: ${houseFlatNo}, ${street}, ${area}, ${city}, ${state} - ${pincode}`, 14, 58);
+    doc.text(`UPI UTR / Transaction ID: ${utrVal || 'Submitted (Verification Pending)'}`, 14, 64);
 
-    let y = 84;
+    let y = 78;
     doc.text('Order Line Items:', 14, y);
     y += 8;
 
@@ -170,29 +165,32 @@ export default function CheckoutPage() {
     y += 6;
     doc.text(`State Delivery Charge (${state}): Rs.${shippingFee}`, 14, y);
     y += 6;
-    doc.text(`GST (18%): Rs.${gstAmount}`, 14, y);
-    y += 6;
     doc.text(`Discount: -Rs.${appliedDiscount}`, 14, y);
     y += 8;
     doc.setFontSize(12);
     doc.text(`Grand Total: Rs.${grandTotal}`, 14, y);
     y += 12;
     doc.setFontSize(9);
-    doc.text('Payment Status: Payment Verification Pending (Verification in Progress)', 14, y);
-
+    doc.text('Note: Factory Direct Order • Payment Verification Pending', 14, y);
     doc.save(`HC_DTF_Invoice_${orderId}.pdf`);
   };
 
-  const handleFinalOrderSubmit = (e) => {
-    if (e) e.preventDefault();
-    
+  const handleFinalOrderSubmit = async (e) => {
+    e.preventDefault();
+    if (!transactionId.trim()) {
+      alert('Please enter your 12-digit UPI UTR / Transaction ID.');
+      return;
+    }
+
     setIsSubmittingOrder(true);
 
-    if (selectedAddressId === 'new') {
-      addSavedAddress({
-        fullName,
-        mobile,
-        email,
+    const newOrderObj = {
+      id: `HC-ORD-${Math.floor(1000 + Math.random() * 9000)}`,
+      createdAt: new Date().toISOString(),
+      customerName: fullName,
+      phone: mobile,
+      email: email,
+      shippingAddress: {
         houseFlatNo,
         street,
         area,
@@ -201,136 +199,48 @@ export default function CheckoutPage() {
         district,
         state,
         pincode
-      });
-    }
+      },
+      items: cart,
+      subtotal,
+      shippingFee,
+      appliedDiscount,
+      total: grandTotal,
+      paymentMethod: 'Prepaid Manual UPI (Verification Pending)',
+      upiTransactionId: transactionId.trim(),
+      paymentScreenshotUrl: paymentScreenshot || null,
+      status: 'Payment Verification Pending',
+      trackingNumber: '',
+      courierPartner: ''
+    };
 
-    const utrValue = transactionId.trim() || `UPI-TXN-${Date.now().toString().slice(-8)}`;
-
-    setTimeout(() => {
-      const fullAddressFormatted = `${houseFlatNo}, ${street}, ${area}, ${landmark ? 'Landmark: ' + landmark + ', ' : ''}${city}, ${district}, ${state} - ${pincode}`;
-
-      const newOrder = createOrder({
-        customerName: fullName,
-        customerEmail: email,
-        customerPhone: mobile,
-        address: fullAddressFormatted,
-        shippingState: state,
-        items: cart,
-        subtotal,
-        gst: gstAmount,
-        shipping: shippingFee,
-        total: grandTotal,
-        transactionId: utrValue,
-        paymentScreenshot: paymentScreenshot || '',
-        paymentStatus: 'Verification Pending',
-        status: 'Payment Verification Pending'
-      });
-
-      generatePDFInvoice(newOrder.id, utrValue);
+    try {
+      addOrder(newOrderObj);
+      setCreatedOrderData(newOrderObj);
+      clearCart();
       setIsSubmittingOrder(false);
-      setCreatedOrderData(newOrder);
-    }, 1000);
+      setStep(3); // Step 3 = Order Submitted Success Screen
+    } catch (err) {
+      console.error(err);
+      setIsSubmittingOrder(false);
+      alert('Error creating order. Please try again.');
+    }
   };
 
-  if (cart.length === 0 && !createdOrderData) {
+  if (cart.length === 0 && step !== 3) {
     return (
       <div className="py-20 bg-slate-50 min-h-screen flex items-center justify-center">
-        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-md text-center max-w-md space-y-4">
-          <h2 className="text-2xl font-black text-slate-900">Your Cart is Empty</h2>
-          <p className="text-xs text-slate-500">Please add DTF transfer sheets or patches before proceeding to checkout.</p>
-          <button
-            onClick={() => router.push('/shop')}
-            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-2xl transition"
+        <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-4 max-w-md shadow-xl">
+          <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+            <ShoppingBag size={32} />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900">Your Checkout Cart is Empty</h2>
+          <p className="text-xs text-slate-500">Add products to your cart before proceeding to checkout.</p>
+          <Link
+            href="/shop"
+            className="inline-block px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-emerald-600/20 transition"
           >
-            Explore Catalog
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // OTP AUTHENTICATION GUARD
-  if (!customerUser) {
-    return (
-      <div className="py-16 bg-slate-50 min-h-screen flex items-center justify-center p-4">
-        <div className="bg-white p-8 sm:p-10 rounded-3xl border border-slate-200 shadow-xl text-center max-w-md w-full space-y-6">
-          <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-3xl flex items-center justify-center mx-auto font-black text-2xl">
-            <KeyRound size={32} />
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">OTP Login Required</h2>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Please sign in using Mobile Number OTP or Email OTP before entering shipping address details.
-            </p>
-          </div>
-
-          <button
-            onClick={() => setIsAuthOpen(true)}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition"
-          >
-            <UserCheck size={18} /> Sign In via Mobile / Email OTP
-          </button>
-
-          <p className="text-[11px] text-slate-400">
-            No password required • Account automatically created on 1st login
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // PAYMENT VERIFICATION PENDING SUCCESS MODAL / SCREEN
-  if (createdOrderData) {
-    return (
-      <div className="py-16 bg-slate-50 min-h-screen flex items-center justify-center p-4">
-        <div className="bg-white p-8 sm:p-12 rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full text-center space-y-6">
-          
-          <div className="w-20 h-20 rounded-full bg-emerald-100 border-2 border-emerald-400 text-emerald-600 flex items-center justify-center mx-auto animate-bounce">
-            <CheckCircle2 size={44} />
-          </div>
-
-          <div className="space-y-2">
-            <span className="px-3 py-1 bg-amber-100 text-amber-800 font-extrabold text-xs rounded-full uppercase tracking-wider inline-block">
-              Payment Verification Pending
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-              Order #{createdOrderData.id} Submitted!
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-700 font-bold leading-relaxed pt-2">
-              "Thank you. Your payment request has been submitted. Our system is verifying your payment. You will receive confirmation shortly."
-            </p>
-          </div>
-
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-left text-xs space-y-2">
-            <div className="flex justify-between border-b border-slate-200 pb-2">
-              <span className="text-slate-500 font-medium">Grand Total Amount:</span>
-              <strong className="text-slate-900 font-black">₹{createdOrderData.total?.toLocaleString()}</strong>
-            </div>
-            <div className="flex justify-between border-b border-slate-200 pb-2">
-              <span className="text-slate-500 font-medium">UTR / Ref Number:</span>
-              <strong className="text-emerald-700 font-mono font-bold">{createdOrderData.transactionId}</strong>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500 font-medium">Order Status:</span>
-              <strong className="text-amber-600 font-bold">Payment Verification Pending</strong>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-            <button
-              onClick={() => router.push(`/track-order/${createdOrderData.id}`)}
-              className="py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-2xl shadow-lg transition"
-            >
-              Track Order Status Live
-            </button>
-            <button
-              onClick={() => router.push('/account')}
-              className="py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-2xl transition"
-            >
-              Go to My Account
-            </button>
-          </div>
-
+            Explore DTF Products
+          </Link>
         </div>
       </div>
     );
@@ -340,213 +250,197 @@ export default function CheckoutPage() {
     <div className="py-12 bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         
-        {/* Header & Step Indicator */}
-        <div className="border-b border-slate-200 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        {/* Header Bar */}
+        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
           <div>
-            <h1 className="text-3xl font-black text-slate-900">Prepaid Express Checkout</h1>
-            <p className="text-xs text-slate-500 mt-1">Direct Factory Order • State-Wise Delivery • Prepaid UPI Payment</p>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900">Prepaid Express Checkout</h1>
+            <p className="text-xs text-slate-500">Official Factory Direct Order • Ships within 1–3 Business Days</p>
           </div>
-
-          <div className="flex items-center gap-2 text-xs font-bold">
-            <span className={`px-3 py-1.5 rounded-full ${step === 1 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-              1. Delivery Address
-            </span>
-            <span className="text-slate-400">→</span>
-            <span className={`px-3 py-1.5 rounded-full ${step === 2 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-              2. Complete Prepaid UPI Payment
-            </span>
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
+            <ShieldCheck size={18} className="text-emerald-600" />
+            <span>Prepaid UPI Transfer</span>
           </div>
         </div>
 
-        {/* STEP 1: ADDRESS & NO-RETURNS POLICY */}
+        {/* STEP 1: SHIPPING ADDRESS & STORE POLICY AGREEMENT */}
         {step === 1 && (
           <form onSubmit={handleProceedToPaymentStep} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
             <div className="lg:col-span-7 space-y-6">
               
-              {/* Saved Addresses Selector */}
-              {customerUser?.addresses?.length > 0 && (
+              {/* Saved Addresses Quick Selector */}
+              {savedAddresses.length > 0 && (
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
-                  <h3 className="text-xs font-extrabold uppercase text-slate-900 tracking-wider flex items-center gap-2">
-                    <MapPin size={16} className="text-emerald-600" />
-                    Select Saved Delivery Address
+                  <h3 className="text-xs font-extrabold uppercase text-slate-900 tracking-wider">
+                    Select From Saved Addresses
                   </h3>
-
-                  <div className="grid grid-cols-1 gap-2">
-                    {customerUser.addresses.map((addr) => (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {savedAddresses.map((addr) => (
                       <button
                         key={addr.id}
                         type="button"
                         onClick={() => handleSelectSavedAddress(addr)}
-                        className={`p-3 rounded-2xl border text-left text-xs transition flex items-center justify-between ${
+                        className={`p-3.5 rounded-2xl border text-left text-xs transition ${
                           selectedAddressId === addr.id
-                            ? 'border-emerald-600 bg-emerald-50 text-slate-900 font-bold'
+                            ? 'border-emerald-600 bg-emerald-50/50 text-slate-900 font-bold'
                             : 'border-slate-200 hover:border-slate-300 text-slate-600'
                         }`}
                       >
-                        <div>
-                          <span className="font-bold text-slate-900">{addr.houseFlatNo}, {addr.street}</span>
-                          <p className="text-[11px] text-slate-500">{addr.area}, {addr.city}, {addr.state} - {addr.pincode}</p>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-extrabold text-slate-900">{addr.fullName}</span>
+                          <MapPin size={14} className="text-emerald-600" />
                         </div>
-                        {selectedAddressId === addr.id && <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />}
+                        <p className="text-[11px] text-slate-500 truncate">{addr.houseFlatNo}, {addr.street}, {addr.city}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">{addr.mobile}</p>
                       </button>
                     ))}
-
-                    <button
-                      type="button"
-                      onClick={() => setSelectedAddressId('new')}
-                      className={`p-3 rounded-2xl border text-left text-xs font-bold transition flex items-center gap-2 ${
-                        selectedAddressId === 'new' ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-600'
-                      }`}
-                    >
-                      <PlusCircle size={16} /> Enter New Custom Address
-                    </button>
                   </div>
                 </div>
               )}
 
-              {/* Detailed Address Entry Form */}
+              {/* Shipping Address Inputs */}
               <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider">
-                  Full Shipping & Delivery Address Details
+                <h3 className="text-sm font-black text-slate-900 border-b border-slate-100 pb-3">
+                  1. Customer Shipping Address
                 </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">Full Name *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Full Name *</label>
                     <input
                       type="text"
                       required
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500"
+                      placeholder="Enter your full name"
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">Mobile Number *</label>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Mobile Number *</label>
                     <input
                       type="tel"
                       required
                       value={mobile}
                       onChange={(e) => setMobile(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500"
+                      placeholder="10-digit mobile number"
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
                     />
                   </div>
+                </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="block text-slate-700 font-bold mb-1">Email Address (For Tax Invoice PDF) *</label>
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Email Address *</label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter email address"
+                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
 
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">House / Flat No *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">House / Flat / Door No *</label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Plot #45, Flat 402"
                       value={houseFlatNo}
                       onChange={(e) => setHouseFlatNo(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500"
+                      placeholder="Flat No, Building, House"
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">Street *</label>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Street / Road *</label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Textile Hub Main Road"
                       value={street}
                       onChange={(e) => setStreet(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500"
+                      placeholder="Street name"
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
                     />
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">Area *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Area / Colony *</label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Jubilee Hills"
                       value={area}
                       onChange={(e) => setArea(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500"
+                      placeholder="Colony or Area"
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">Landmark (Optional)</label>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Landmark (Optional)</label>
                     <input
                       type="text"
-                      placeholder="e.g. Opposite Metro Station"
                       value={landmark}
                       onChange={(e) => setLandmark(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500"
+                      placeholder="Near landmark"
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
                     />
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">City *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">City *</label>
                     <input
                       type="text"
                       required
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500"
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">District *</label>
-                    <input
-                      type="text"
-                      required
-                      value={district}
-                      onChange={(e) => setDistrict(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">State (Auto-Calculates Delivery Charge) *</label>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">State *</label>
                     <select
                       value={state}
                       onChange={(e) => setState(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 font-bold text-slate-900"
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold text-slate-900 focus:outline-none focus:border-emerald-500"
                     >
-                      <option value="Andhra Pradesh">Andhra Pradesh (Delivery: ₹150)</option>
-                      <option value="Telangana">Telangana (Delivery: ₹150)</option>
-                      <option value="Tamil Nadu">Tamil Nadu (Delivery: ₹180)</option>
-                      <option value="Karnataka">Karnataka (Delivery: ₹180)</option>
-                      <option value="Kerala">Kerala (Delivery: ₹200)</option>
-                      <option value="Maharashtra">Maharashtra (Delivery: ₹200)</option>
-                      <option value="Delhi">Delhi (Delivery: ₹200)</option>
-                      <option value="Gujarat">Gujarat (Delivery: ₹200)</option>
-                      <option value="Other States">Other States (Delivery: ₹200)</option>
+                      <option value="Andhra Pradesh">Andhra Pradesh (₹150)</option>
+                      <option value="Telangana">Telangana (₹150)</option>
+                      <option value="Tamil Nadu">Tamil Nadu (₹180)</option>
+                      <option value="Karnataka">Karnataka (₹180)</option>
+                      <option value="Kerala">Kerala (₹200)</option>
+                      <option value="Maharashtra">Maharashtra (₹200)</option>
+                      <option value="Gujarat">Gujarat (₹200)</option>
+                      <option value="Delhi">Delhi (₹200)</option>
+                      <option value="Other States">Other States (₹200)</option>
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">Pincode *</label>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Pincode *</label>
                     <input
                       type="text"
                       required
+                      maxLength={6}
                       value={pincode}
                       onChange={(e) => setPincode(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 font-mono"
+                      placeholder="6-digit pincode"
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
                     />
                   </div>
                 </div>
+
               </div>
 
-              {/* MANDATORY NO-RETURN POLICY CHECKBOX */}
+              {/* No Returns Policy Agreement */}
               <div className="bg-emerald-950 text-white p-6 rounded-3xl border border-emerald-800 space-y-3">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
@@ -615,11 +509,6 @@ export default function CheckoutPage() {
                     </div>
                   )}
 
-                  <div className="flex justify-between">
-                    <span>GST (18% Factory Tax)</span>
-                    <span className="font-bold text-slate-900">₹{gstAmount.toLocaleString()}</span>
-                  </div>
-
                   <div className="flex justify-between border-t border-slate-200 pt-3 text-base font-black text-slate-900">
                     <span>Grand Total Amount</span>
                     <span className="text-emerald-700">₹{grandTotal.toLocaleString()}</span>
@@ -635,9 +524,7 @@ export default function CheckoutPage() {
         {step === 2 && (
           <form onSubmit={handleFinalOrderSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
-            {/* Left Column: Official Store UPI Details & Dynamic QR Code */}
             <div className="lg:col-span-6 space-y-6">
-              
               <div className="bg-slate-900 text-white p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-2xl space-y-6">
                 
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -648,131 +535,167 @@ export default function CheckoutPage() {
                     <h3 className="text-xl font-black text-white mt-1">Prepaid UPI Express Payment</h3>
                   </div>
                   <button type="button" onClick={() => setStep(1)} className="text-xs text-slate-400 hover:text-white underline">
-                    ← Edit Address
+                    Edit Address
                   </button>
                 </div>
 
-                {/* Account Details Box */}
-                <div className="space-y-3 bg-slate-950 p-5 rounded-2xl border border-slate-800 text-xs">
-                  
-                  <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                    <span className="text-slate-400 font-bold">Account Name:</span>
-                    <strong className="text-white font-extrabold text-sm">{merchantName}</strong>
+                <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">Account Name:</span>
+                    <strong className="text-white font-mono text-sm">{merchantName}</strong>
                   </div>
-
-                  <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                    <span className="text-slate-400 font-bold">Contact Number:</span>
-                    <strong className="text-white font-mono font-bold text-sm">{settings.upiMobile || '+91 8121635407'}</strong>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">Contact Number:</span>
+                    <strong className="text-emerald-400 font-mono text-sm">+91 8121635407</strong>
                   </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400 font-bold">Official UPI ID:</span>
+                  <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-800">
+                    <span className="text-slate-400">Official UPI ID:</span>
                     <div className="flex items-center gap-2">
-                      <strong className="text-emerald-400 font-mono font-black text-sm">{officialUpiId}</strong>
+                      <strong className="text-white font-mono text-xs bg-slate-900 px-2 py-1 rounded border border-slate-700">
+                        {officialUpiId}
+                      </strong>
                       <button
                         type="button"
                         onClick={handleCopyUpi}
-                        className="p-1.5 bg-emerald-950 text-emerald-300 hover:bg-emerald-900 rounded-lg border border-emerald-700 transition"
+                        className="p-1 text-emerald-400 hover:text-emerald-300"
                         title="Copy UPI ID"
                       >
-                        {copiedUpi ? <Check size={14} /> : <Copy size={14} />}
+                        {copiedUpi ? <Check size={16} /> : <Copy size={16} />}
                       </button>
                     </div>
                   </div>
-
                 </div>
 
-                {/* DYNAMIC PREFILLED AMOUNT UPI QR CODE & DIRECT PAY BUTTON */}
-                <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 text-center space-y-4">
-                  <p className="text-xs font-extrabold text-emerald-400">
-                    Scan below or tap button — Amount ₹{grandTotal.toFixed(2)} is automatically prefilled!
+                {/* Dynamic QR Code */}
+                <div className="bg-white p-6 rounded-3xl text-center space-y-3 max-w-xs mx-auto shadow-xl">
+                  <p className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                    Scan with any UPI App
                   </p>
+                  <img
+                    src={dynamicQrCodeUrl}
+                    alt="Prepaid UPI QR Code"
+                    className="w-48 h-48 mx-auto object-contain rounded-xl border border-slate-200"
+                  />
+                  <p className="text-base font-black text-emerald-700">₹{grandTotal}</p>
+                  <a
+                    href={upiDeepLinkUri}
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition"
+                  >
+                    <span>Pay ₹{grandTotal} in GPay / PhonePe</span>
+                    <ArrowRight size={14} />
+                  </a>
+                </div>
 
-                  <div className="bg-white p-3 rounded-2xl inline-block shadow-2xl border border-slate-200">
-                    <img
-                      src={dynamicQrCodeUrl}
-                      alt={`Dynamic UPI QR Code for ₹${grandTotal}`}
-                      className="w-64 sm:w-72 h-auto max-w-full mx-auto rounded-xl object-contain shadow-md"
+              </div>
+            </div>
+
+            {/* Right Column: 1-Tap Payment Submission Inputs */}
+            <div className="lg:col-span-6 space-y-6">
+              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                
+                <div className="border-b border-slate-100 pb-4 space-y-1">
+                  <h3 className="text-lg font-black text-slate-900">Confirm Payment Details</h3>
+                  <p className="text-xs text-slate-500">Enter your UPI UTR Transaction ID to complete order verification.</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-extrabold text-slate-900">
+                      12-Digit UPI Transaction ID / UTR *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={transactionId}
+                      onChange={(e) => setTransactionId(e.target.value)}
+                      placeholder="e.g. 324109854123"
+                      className="w-full text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold text-slate-900 focus:outline-none focus:border-emerald-500"
                     />
                   </div>
 
-                  <div className="pt-2">
-                    <a
-                      href={upiDeepLinkUri}
-                      className="w-full py-4 bg-gradient-to-r from-emerald-600 to-emerald-800 hover:from-emerald-500 hover:to-emerald-700 text-white font-black rounded-2xl text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition"
-                    >
-                      <Smartphone size={18} />
-                      <span>Tap to Pay ₹{grandTotal.toFixed(2)} in Google Pay / PhonePe / Paytm</span>
-                      <ExternalLink size={16} />
-                    </a>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">
+                      Upload Payment Screenshot (Optional)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleScreenshotUpload}
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium text-slate-700"
+                    />
                   </div>
                 </div>
 
-              </div>
-
-            </div>
-
-            {/* Right Column: 1-Tap "I HAVE COMPLETED PAYMENT" Confirmation */}
-            <div className="lg:col-span-6 space-y-6">
-              
-              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
-                
-                <div>
-                  <h3 className="text-lg font-black text-slate-900 tracking-tight">Confirm Payment & Submit Order</h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Once you complete the UPI payment in Google Pay / PhonePe / Paytm, click below.
-                  </p>
-                </div>
-
-                {/* 1. UPI Transaction ID / UTR Number (Optional / Quick) */}
-                <div>
-                  <label className="block text-xs font-extrabold text-slate-900 mb-1.5">
-                    UPI Transaction ID / 12-Digit UTR Number (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 421589012345 (Found in GPay / PhonePe receipt)"
-                    value={transactionId}
-                    onChange={(e) => setTransactionId(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-3.5 text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-emerald-500"
-                  />
-                  <p className="text-[11px] text-slate-400 mt-1">Optional. Entering your UTR speeds up automatic bank credit verification.</p>
-                </div>
-
-                {/* Optional Screenshot Upload */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Upload Payment Screenshot Receipt (Optional)
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleScreenshotUpload}
-                    className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
-                  />
-                </div>
-
-                {/* 1-TAP COMPLETED PAYMENT SUBMIT BUTTON */}
                 <button
                   type="submit"
-                  disabled={isSubmittingOrder}
-                  className="w-full py-5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-sm shadow-xl shadow-emerald-600/30 flex items-center justify-center gap-2 transition"
+                  disabled={isSubmittingOrder || !transactionId.trim()}
+                  className={`w-full py-4 rounded-2xl text-xs font-extrabold shadow-xl transition flex items-center justify-center gap-2 ${
+                    transactionId.trim() && !isSubmittingOrder
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 active:scale-95'
+                      : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                  }`}
                 >
-                  <CheckCircle2 size={20} />
-                  <span>
-                    {isSubmittingOrder ? 'Submitting Order...' : 'I HAVE COMPLETED PAYMENT'}
-                  </span>
+                  <Check size={18} />
+                  <span>I HAVE COMPLETED PAYMENT</span>
                 </button>
 
-                <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-900 font-medium leading-relaxed">
-                  <strong>Confirmation Guarantee:</strong> After clicking <em>I HAVE COMPLETED PAYMENT</em>, your order status will be set to <strong>Payment Verification Pending</strong> and our system will confirm your order shortly.
-                </div>
-
               </div>
-
             </div>
 
           </form>
+        )}
+
+        {/* STEP 3: ORDER SUBMITTED SUCCESS DISPLAY */}
+        {step === 3 && createdOrderData && (
+          <div className="max-w-2xl mx-auto bg-white p-8 sm:p-12 rounded-3xl border border-slate-200 shadow-2xl text-center space-y-6">
+            <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-md">
+              <Check size={40} />
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-xs font-extrabold uppercase text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                Payment Verification Pending
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
+                Thank You for Your Order!
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 max-w-lg mx-auto">
+                Your payment request has been submitted. Our system is verifying your payment and we will start processing your order shortly.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs text-left space-y-2 max-w-md mx-auto">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Order ID:</span>
+                <strong className="text-slate-900 font-mono">{createdOrderData.id}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Grand Total:</span>
+                <strong className="text-emerald-700 font-mono">₹{createdOrderData.total}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Transaction ID (UTR):</span>
+                <strong className="text-slate-900 font-mono">{createdOrderData.upiTransactionId}</strong>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+              <button
+                onClick={() => generatePDFInvoice(createdOrderData.id, createdOrderData.upiTransactionId)}
+                className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-2xl flex items-center gap-2 transition"
+              >
+                <FileText size={16} />
+                <span>Download Invoice PDF</span>
+              </button>
+
+              <Link
+                href="/account?tab=orders"
+                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-2xl shadow-md transition"
+              >
+                Track Order Status
+              </Link>
+            </div>
+          </div>
         )}
 
       </div>

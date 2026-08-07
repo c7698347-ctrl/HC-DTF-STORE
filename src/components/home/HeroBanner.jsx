@@ -24,7 +24,7 @@ const HERO_SLIDES = [
   {
     id: 'slide-3',
     title: 'Custom Printing',
-    subtitle: 'Upload Your Custom Design Gang Sheet & Get Express Same-Day Dispatch',
+    subtitle: 'Upload Your Custom Design Gang Sheet & Get Dispatch Within 1-3 Business Days',
     buttonText: 'Upload Your Design',
     buttonLink: '/shop',
     image: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&q=80&w=1200'
@@ -100,12 +100,12 @@ export default function HeroBanner() {
               <p className="text-[11px] text-slate-400">Ultra-HD Quality</p>
             </div>
             <div>
-              <p className="text-xl sm:text-2xl font-black text-emerald-400">50+ Washes</p>
+              <p className="text-xl sm:text-2xl font-black text-emerald-400">25+ Washes</p>
               <p className="text-[11px] text-slate-400">Wash Durability</p>
             </div>
             <div>
-              <p className="text-xl sm:text-2xl font-black text-emerald-400">Same-Day</p>
-              <p className="text-[11px] text-slate-400">Express Dispatch</p>
+              <p className="text-xl sm:text-2xl font-black text-emerald-400">1-3 Days</p>
+              <p className="text-[11px] text-slate-400">Fast Dispatch</p>
             </div>
           </div>
 

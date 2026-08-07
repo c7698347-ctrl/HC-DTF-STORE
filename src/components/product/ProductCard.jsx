@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Heart, ShoppingBag, Eye, Star, Zap } from 'lucide-react';
+import { Heart, ShoppingBag, Eye, Star } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
 export default function ProductCard({ product }) {
@@ -10,11 +10,10 @@ export default function ProductCard({ product }) {
     addToCart, 
     wishlist, 
     toggleWishlist, 
-    setQuickViewProduct,
-    t 
+    setQuickViewProduct
   } = useStore();
 
-  const isWishlisted = wishlist.some((item) => item.id === product.id);
+  const isWishlisted = (wishlist || []).some((item) => item.id === product.id);
 
   const displayPrice = product.price || product.originalPrice || 0;
   const offerPrice = product.offerPrice || displayPrice;
@@ -108,7 +107,7 @@ export default function ProductCard({ product }) {
                 <span className="text-xs text-slate-400 line-through">₹{displayPrice}</span>
               )}
             </div>
-            <span className="text-[10px] text-slate-400 font-medium block">Factory Price • 18% GST</span>
+            <span className="text-[10px] text-slate-400 font-medium block">Factory Direct Price</span>
           </div>
 
           <button

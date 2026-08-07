@@ -27,15 +27,14 @@ export default function CartDrawer() {
     updateCartQuantity,
     moveToBuyLater,
     t,
-    settings,
-    getShippingFeeForState
+    settings
   } = useStore();
 
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponInput, setCouponInput] = useState('');
   const [couponMsg, setCouponMsg] = useState('');
 
-  // Robust, Crash-Proof Cart Financial Calculations
+  // Robust, Crash-Proof Cart Financial Calculations (No GST)
   const cartItems = Array.isArray(cart) ? cart : [];
   
   const cartSubtotal = cartItems.reduce((sum, item) => {
@@ -46,9 +45,8 @@ export default function CartDrawer() {
 
   const couponDiscount = appliedCoupon ? Math.round((cartSubtotal * (Number(appliedCoupon.percent) || 0)) / 100) : 0;
   const taxableTotal = Math.max(0, cartSubtotal - couponDiscount);
-  const gstAmount = Math.round(taxableTotal * 0.18);
   const estimatedShipping = cartSubtotal > (settings.freeShippingAbove || 999) || cartSubtotal === 0 ? 0 : 150;
-  const cartTotal = taxableTotal + gstAmount + estimatedShipping;
+  const cartTotal = taxableTotal + estimatedShipping;
 
   if (!isCartOpen) return null;
 
@@ -253,11 +251,6 @@ export default function CartDrawer() {
                     <span>- ₹{(couponDiscount ?? 0).toLocaleString('en-IN')}</span>
                   </div>
                 )}
-
-                <div className="flex justify-between">
-                  <span>GST (18% Factory Tax)</span>
-                  <span className="font-semibold text-slate-900">₹{(gstAmount ?? 0).toLocaleString('en-IN')}</span>
-                </div>
 
                 <div className="flex justify-between">
                   <span>State-Wise Shipping</span>

@@ -17,7 +17,7 @@ import ProductCard from '@/components/product/ProductCard';
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { products = [], addToCart, wishlist = [], toggleWishlist, moveToBuyLater, t } = useStore();
+  const { products = [], addToCart, wishlist = [], toggleWishlist, moveToBuyLater } = useStore();
 
   const slugOrId = params?.slug;
   const product = products.find((p) => p.slug === slugOrId || p.id === slugOrId) || products[0];
@@ -152,7 +152,7 @@ export default function ProductDetailPage() {
               </div>
               <p className="text-xs text-slate-500 flex items-center gap-1.5">
                 <ShieldCheck size={16} className="text-emerald-600" />
-                <span>Price includes 18% GST • Same-Day Dispatch Across India</span>
+                <span>Ships within 1–3 Business Days Across India • Quality Inspected</span>
               </p>
             </div>
 

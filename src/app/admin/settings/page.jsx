@@ -3,19 +3,9 @@
 import React, { useState } from 'react';
 import { 
   Store, 
-  ShieldCheck, 
   Truck, 
-  Globe, 
   Save, 
   CheckCircle2, 
-  MessageSquare, 
-  Flame, 
-  Clock, 
-  Calendar, 
-  Copy, 
-  Image as ImageIcon, 
-  Plus, 
-  Trash2,
   CreditCard
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
@@ -26,17 +16,13 @@ export default function AdminSettingsPage() {
     settings, 
     setSettings, 
     flashSale, 
-    createFlashSale, 
-    duplicateFlashSale, 
-    banners, 
-    setBanners 
+    createFlashSale
   } = useStore();
 
   const [savedMsg, setSavedMsg] = useState('');
 
   // Store General Settings Form
   const [storeName, setStoreName] = useState(settings.storeName || 'HC DTF STORE');
-  const [gstNumber, setGstNumber] = useState(settings.gstNumber || '36ABCDE1234F1Z5');
   const [shippingCharges, setShippingCharges] = useState(settings.shippingCharges || 150);
   const [freeShippingAbove, setFreeShippingAbove] = useState(settings.freeShippingAbove || 999);
 
@@ -53,17 +39,6 @@ export default function AdminSettingsPage() {
   const [upiQrCodeUrl, setUpiQrCodeUrl] = useState(settings.upiQrCodeUrl || '/gpay-qr.png');
   const [seoTitle, setSeoTitle] = useState(settings.seoTitle || '');
   const [seoDescription, setSeoDescription] = useState(settings.seoDescription || '');
-  const [googleAnalyticsId, setGoogleAnalyticsId] = useState(settings.googleAnalyticsId || '');
-
-  // Flash Sale Manager Form State
-  const [flashTitle, setFlashTitle] = useState(flashSale.title || 'Weekend Festival Mega Flash Sale');
-  const [flashStartDate, setFlashStartDate] = useState(flashSale.startDate || '2026-08-06');
-  const [flashStartTime, setFlashStartTime] = useState(flashSale.startTime || '00:00');
-  const [flashEndDate, setFlashEndDate] = useState(flashSale.endDate || '2026-08-10');
-  const [flashEndTime, setFlashEndTime] = useState(flashSale.endTime || '23:59');
-  const [flashRepeatMode, setFlashRepeatMode] = useState(flashSale.repeatMode || 'Weekly');
-  const [flashDiscount, setFlashDiscount] = useState(flashSale.discountPercent || 40);
-  const [flashEnabled, setFlashEnabled] = useState(flashSale.enabled !== false);
 
   const handleStateRateChange = (stateName, value) => {
     setStateRates((prev) => ({
@@ -77,7 +52,6 @@ export default function AdminSettingsPage() {
     setSettings({
       ...settings,
       storeName,
-      gstNumber,
       shippingCharges: Number(shippingCharges),
       freeShippingAbove: Number(freeShippingAbove),
       stateShippingRates: stateRates,
@@ -90,28 +64,10 @@ export default function AdminSettingsPage() {
       upiId,
       upiQrCodeUrl,
       seoTitle,
-      seoDescription,
-      googleAnalyticsId
+      seoDescription
     });
 
     setSavedMsg('Store configuration & State-Wise shipping rates saved successfully!');
-    setTimeout(() => setSavedMsg(''), 3000);
-  };
-
-  const handleSaveFlashSale = (e) => {
-    e.preventDefault();
-    createFlashSale({
-      title: flashTitle,
-      startDate: flashStartDate,
-      startTime: flashStartTime,
-      endDate: flashEndDate,
-      endTime: flashEndTime,
-      repeatMode: flashRepeatMode,
-      discountPercent: Number(flashDiscount),
-      enabled: flashEnabled
-    });
-
-    setSavedMsg('Flash Sale configuration updated live!');
     setTimeout(() => setSavedMsg(''), 3000);
   };
 
@@ -121,7 +77,7 @@ export default function AdminSettingsPage() {
       {/* Header */}
       <div className="border-b border-slate-800 pb-6">
         <h1 className="text-2xl sm:text-4xl font-black text-white">Settings → Shipping & Official UPI Controller</h1>
-        <p className="text-xs text-slate-400 mt-1">Configure State-Wise Delivery Pricing, Minimum Free Shipping, Official UPI & GSTIN</p>
+        <p className="text-xs text-slate-400 mt-1">Configure State-Wise Delivery Pricing, Minimum Free Shipping & Official UPI Details</p>
       </div>
 
       {savedMsg && (
@@ -285,15 +241,15 @@ export default function AdminSettingsPage() {
         </div>
       </div>
 
-      {/* 3. STORE GENERAL & GST SETTINGS FORM */}
+      {/* 3. STORE GENERAL SETTINGS FORM */}
       <form onSubmit={handleSaveStoreSettings} className="bg-slate-900 rounded-3xl border border-slate-800 p-6 sm:p-8 space-y-6">
         <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
           <div className="w-10 h-10 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center">
             <Store size={22} />
           </div>
           <div>
-            <h2 className="font-extrabold text-white text-lg">General Store & Tax Settings</h2>
-            <p className="text-xs text-slate-400">Configure official GSTIN, contact numbers & SEO</p>
+            <h2 className="font-extrabold text-white text-lg">General Store Settings</h2>
+            <p className="text-xs text-slate-400">Configure official contact numbers & SEO</p>
           </div>
         </div>
 
@@ -306,17 +262,6 @@ export default function AdminSettingsPage() {
               value={storeName}
               onChange={(e) => setStoreName(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-300 font-bold mb-1">Official GSTIN Number *</label>
-            <input
-              type="text"
-              required
-              value={gstNumber}
-              onChange={(e) => setGstNumber(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-emerald-400 font-mono font-bold"
             />
           </div>
 
@@ -338,6 +283,17 @@ export default function AdminSettingsPage() {
               required
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-300 font-bold mb-1">Support Email Address *</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono"
             />
           </div>
