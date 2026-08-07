@@ -5,6 +5,7 @@ import Footer from '@/components/layout/Footer';
 import CartDrawer from '@/components/checkout/CartDrawer';
 import AuthModal from '@/components/auth/AuthModal';
 import ProductDetailModal from '@/components/product/ProductDetailModal';
+import HisuhiAiWidget from '@/components/layout/HisuhiAiWidget';
 
 export const metadata = {
   title: 'HC DTF STORE - Premium Direct-To-Film Transfer Sheets & Patches',
@@ -28,10 +29,11 @@ export default function RootLayout({ children }) {
           </main>
           <Footer />
           
-          {/* Global Interactivity Modals */}
+          {/* Global Interactivity Modals & HISUHI AI Assistant */}
           <CartDrawer />
           <AuthModal />
           <ProductDetailModal />
+          <HisuhiAiWidget />
         </StoreProvider>
       </body>
     </html>
