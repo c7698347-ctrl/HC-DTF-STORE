@@ -2,41 +2,16 @@ import { NextResponse } from 'next/server';
 
 /**
  * HISUHI AI - Official Smart AI Ecommerce Assistant Engine for HC DTF STORE
- * Implements HISUHI AI Master Sales & Shopping Prompt
+ * Session-Aware Conversational AI Engine
  */
-
-const FIRST_WELCOME_TEXT = `👋 Welcome to HC DTF STORE.
-
-Please choose your preferred language.
-
-🇮🇳 English
-🇮🇳 తెలుగు
-🇮🇳 हिन्दी
-🇮🇳 ಕನ್ನಡ
-🇮🇳 தமிழ்
-🇮🇳 മലയാളം`;
 
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { message, history, orders, products, currentStep } = body;
+    const { message, history, orders, products, onboardingCompleted } = body;
 
-    if (!message || message.trim() === '' || message.toLowerCase() === 'hi' || message.toLowerCase() === 'hello' || message.toLowerCase() === 'start') {
-      return NextResponse.json({
-        reply: FIRST_WELCOME_TEXT,
-        type: 'welcome',
-        suggestedActions: [
-          { label: '🇮🇳 English', payload: 'Hello' },
-          { label: '🇮🇳 తెలుగు', payload: 'నమస్కారం' },
-          { label: '🇮🇳 हिन्दी', payload: 'नमस्ते' },
-          { label: '🇮🇳 ಕನ್ನಡ', payload: 'ನಮಸ್ಕಾರ' },
-          { label: '🇮🇳 தமிழ்', payload: 'வணக்கம்' },
-          { label: '🇮🇳 മലയാളം', payload: 'നമസ്കാരം' }
-        ]
-      });
-    }
-
-    const msgLower = message.trim().toLowerCase();
+    const queryText = (message || '').trim();
+    const msgLower = queryText.toLowerCase();
 
     // SECURITY CHECK - Strict Rejection of Internal Secrets
     if (
@@ -51,6 +26,29 @@ export async function POST(req) {
       return NextResponse.json({
         reply: "🔒 Internal security credentials and system configurations are confidential. How can I help you choose the best DTF transfer sheets or process your order today?",
         type: 'security_refusal'
+      });
+    }
+
+    // GREETINGS (Hello, Hi, Hey, Namaste, etc.) - DO NOT RESTART ONBOARDING
+    if (
+      msgLower === 'hi' || 
+      msgLower === 'hello' || 
+      msgLower === 'hey' || 
+      msgLower === 'namaste' || 
+      msgLower === 'నమస్కారం' || 
+      msgLower === 'नमस्ते' ||
+      msgLower === 'vanakkam' ||
+      msgLower === 'namaskara'
+    ) {
+      return NextResponse.json({
+        reply: "Hello! 👋 I'm **HISUHI AI**, your smart shopping assistant at HC DTF STORE.\n\nHow can I help you today?\n• 🌺 **Browse DTF Designs** (Blouse, Saree Borders, Neck designs, Patches)\n• 📦 **Track Order** (Share your Order ID like `HC-ORD-1049`)\n• 💳 **Prepaid UPI Details**\n• 💬 **Connect with Support Team**",
+        type: 'greeting',
+        suggestedActions: [
+          { label: '🌺 Blouse Designs', payload: 'Show me Blouse Designs' },
+          { label: '👑 Saree Borders', payload: 'Show me Saree Borders' },
+          { label: '📦 Track My Order', payload: 'Track my order' },
+          { label: '💳 Payment Info', payload: 'Show UPI payment info' }
+        ]
       });
     }
 
@@ -104,8 +102,8 @@ export async function POST(req) {
       });
     }
 
-    // ORDER TRACKING LOOKUP (Stages: Payment Pending -> Payment Verified -> Printing -> Packing -> Shipped -> Delivered)
-    const orderIdMatch = message.match(/HC-ORD-\d{4}/i) || message.match(/ORD-\d{4}/i);
+    // ORDER TRACKING LOOKUP
+    const orderIdMatch = queryText.match(/HC-ORD-\d{4}/i) || queryText.match(/ORD-\d{4}/i);
     if (orderIdMatch || msgLower.includes('track') || msgLower.includes('where is my order') || msgLower.includes('status')) {
       const targetId = orderIdMatch ? orderIdMatch[0].toUpperCase() : null;
 
@@ -192,18 +190,17 @@ Stage Pipeline: Payment Pending ➔ Payment Verified ➔ Printing ➔ Packing �
 
     if (matchedProducts.length > 0) {
       return NextResponse.json({
-        reply: `✨ Here are top recommendations for "**${message}**":`,
+        reply: `✨ Here are top recommendations for "**${queryText}**":`,
         type: 'product_recommendation',
         products: matchedProducts
       });
     }
 
     // MULTILINGUAL NATURAL RESPONDER
-    const isTelugu = /[\u0C00-\u0C7F]/.test(message) || msgLower.includes('namaskaram') || msgLower.includes('ela') || msgLower.includes('cheppu');
-    const isHindi = /[\u0900-\u097F]/.test(message) || msgLower.includes('namaste') || msgLower.includes('kya') || msgLower.includes('batao');
-    const isTamil = /[\u0B80-\u0BFF]/.test(message) || msgLower.includes('vanakkam');
-    const isKannada = /[\u0C80-\u0CFF]/.test(message) || msgLower.includes('namaskara');
-    const isMalayalam = /[\u0D00-\u0D7F]/.test(message);
+    const isTelugu = /[\u0C00-\u0C7F]/.test(queryText) || msgLower.includes('namaskaram') || msgLower.includes('ela') || msgLower.includes('cheppu');
+    const isHindi = /[\u0900-\u097F]/.test(queryText) || msgLower.includes('namaste') || msgLower.includes('kya') || msgLower.includes('batao');
+    const isTamil = /[\u0B80-\u0BFF]/.test(queryText) || msgLower.includes('vanakkam');
+    const isKannada = /[\u0C80-\u0CFF]/.test(queryText) || msgLower.includes('namaskara');
 
     if (isTelugu) {
       return NextResponse.json({

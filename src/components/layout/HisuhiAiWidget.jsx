@@ -11,14 +11,10 @@ import {
   MicOff, 
   Sparkles, 
   ShoppingBag, 
-  ExternalLink, 
-  MessageSquare, 
   RefreshCw, 
-  Check, 
-  Plus, 
-  ChevronRight,
-  ShieldCheck,
-  PhoneCall
+  PhoneCall,
+  RotateCcw,
+  Globe
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
@@ -33,42 +29,103 @@ Please choose your preferred language.
 🇮🇳 தமிழ்
 🇮🇳 മലയാളം`;
 
+const INITIAL_WELCOME_MESSAGE_OBJ = {
+  id: 'welcome-1',
+  sender: 'hisuhi',
+  text: FIRST_WELCOME_MESSAGE,
+  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  suggestedActions: [
+    { label: '🇮🇳 English', payload: 'English' },
+    { label: '🇮🇳 తెలుగు', payload: 'తెలుగు' },
+    { label: '🇮🇳 हिन्दी', payload: 'हिन्दी' },
+    { label: '🇮🇳 ಕನ್ನಡ', payload: 'ಕನ್ನಡ' },
+    { label: '🇮🇳 தமிழ்', payload: 'தமிழ்' },
+    { label: '🇮🇳 മലയാളം', payload: 'മലയാളം' }
+  ]
+};
+
 export default function HisuhiAiWidget() {
   const router = useRouter();
   const { orders, products, addToCart } = useStore();
 
   const [isOpen, setIsOpen] = useState(false);
   const [inputMsg, setInputMsg] = useState('');
-  const [messages, setMessages] = useState([
-    {
-      id: 'welcome-1',
-      sender: 'hisuhi',
-      text: FIRST_WELCOME_MESSAGE,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      suggestedActions: [
-        { label: '🇮🇳 English', payload: 'Hello' },
-        { label: '🇮🇳 తెలుగు', payload: 'నమస్కారం' },
-        { label: '🇮🇳 हिन्दी', payload: 'नमस्ते' },
-        { label: '🇮🇳 ಕನ್ನಡ', payload: 'ನಮಸ್ಕಾರ' },
-        { label: '🇮🇳 தமிழ்', payload: 'வணக்கம்' },
-        { label: '🇮🇳 മലയാളം', payload: 'നമസ്കാരം' }
-      ]
-    }
-  ]);
-
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  
   const chatEndRef = useRef(null);
 
+  // 1. ON COMPONENT MOUNT: Check localStorage for onboardingCompleted & chatHistory
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isCompleted = localStorage.getItem('hisuhi_onboarding_completed') === 'true';
+      const savedHistory = localStorage.getItem('hisuhi_chat_history');
+
+      if (isCompleted) {
+        setOnboardingCompleted(true);
+        if (savedHistory) {
+          try {
+            const parsed = JSON.parse(savedHistory);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setMessages(parsed);
+              return;
+            }
+          } catch (e) {
+            console.error('Error parsing saved chat history', e);
+          }
+        }
+        // If completed but no history found, load default active session message without onboarding list
+        setMessages([
+          {
+            id: 'welcome-active',
+            sender: 'hisuhi',
+            text: "Hello! 👋 I'm **HISUHI AI**, your smart shopping assistant at HC DTF STORE. How can I help you choose or track your order today?",
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            suggestedActions: [
+              { label: '🌺 Blouse Designs', payload: 'Show me Blouse Designs' },
+              { label: '👑 Saree Borders', payload: 'Show me Saree Borders' },
+              { label: '📦 Track My Order', payload: 'Track my order' }
+            ]
+          }
+        ]);
+      } else {
+        // First time visitor: show onboarding
+        setOnboardingCompleted(false);
+        setMessages([INITIAL_WELCOME_MESSAGE_OBJ]);
+      }
+    }
+  }, []);
+
+  // Scroll to bottom on new messages
   useEffect(() => {
     if (isOpen) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isOpen]);
 
+  // Save chat history & onboarding state to localStorage whenever messages change
+  const saveSession = (newMessages, isCompleted = true) => {
+    setMessages(newMessages);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('hisuhi_chat_history', JSON.stringify(newMessages.slice(-20))); // Keep last 20 messages
+      if (isCompleted) {
+        localStorage.setItem('hisuhi_onboarding_completed', 'true');
+        setOnboardingCompleted(true);
+      }
+    }
+  };
+
   const handleSendMessage = async (textToSend) => {
     const queryText = (textToSend || inputMsg).trim();
     if (!queryText) return;
+
+    // Mark onboarding as completed upon sending any message / selecting language
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('hisuhi_onboarding_completed', 'true');
+      setOnboardingCompleted(true);
+    }
 
     const userMessageObj = {
       id: `user-${Date.now()}`,
@@ -77,7 +134,8 @@ export default function HisuhiAiWidget() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    setMessages((prev) => [...prev, userMessageObj]);
+    const updatedUserMessages = [...messages, userMessageObj];
+    saveSession(updatedUserMessages, true);
     setInputMsg('');
     setIsLoading(true);
 
@@ -87,9 +145,10 @@ export default function HisuhiAiWidget() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: queryText,
-          history: messages,
+          history: updatedUserMessages,
           orders,
-          products
+          products,
+          onboardingCompleted: true
         })
       });
 
@@ -109,21 +168,30 @@ export default function HisuhiAiWidget() {
         suggestedActions: data.suggestedActions
       };
 
-      setMessages((prev) => [...prev, botMessageObj]);
+      const finalMessages = [...updatedUserMessages, botMessageObj];
+      saveSession(finalMessages, true);
 
     } catch (e) {
       console.error('HISUHI AI Communication Error', e);
       setIsLoading(false);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `bot-err-${Date.now()}`,
-          sender: 'hisuhi',
-          text: "I'm HISUHI AI, your shopping assistant! How can I help you choose or track your order today?",
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }
-      ]);
+      const errMessageObj = {
+        id: `bot-err-${Date.now()}`,
+        sender: 'hisuhi',
+        text: "I'm HISUHI AI, your shopping assistant! How can I help you choose or track your order today?",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      saveSession([...updatedUserMessages, errMessageObj], true);
     }
+  };
+
+  const handleResetSession = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('hisuhi_onboarding_completed');
+      localStorage.removeItem('hisuhi_chat_history');
+      localStorage.removeItem('hisuhi_selected_language');
+    }
+    setOnboardingCompleted(false);
+    setMessages([INITIAL_WELCOME_MESSAGE_OBJ]);
   };
 
   const handleVoiceInput = () => {
@@ -195,19 +263,28 @@ export default function HisuhiAiWidget() {
                 <div className="flex items-center gap-1.5">
                   <h3 className="font-black text-sm text-white tracking-tight">HISUHI AI</h3>
                   <span className="text-[10px] uppercase font-bold bg-emerald-950 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded">
-                    Official Assistant
+                    Official
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400">HC DTF STORE Assistant</p>
               </div>
             </div>
 
-            <button
-              onClick={() => setIsOpen(false)}
-              className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
-            >
-              <X size={18} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleResetSession}
+                className="p-1.5 text-slate-400 hover:text-emerald-400 rounded-xl hover:bg-slate-800 transition"
+                title="Clear Chat / Reset Language"
+              >
+                <RotateCcw size={16} />
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           {/* MESSAGES BODY */}
