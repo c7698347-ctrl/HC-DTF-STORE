@@ -25,6 +25,7 @@ export const TRACKING_STAGES = [
 
 // IMMUTABLE DEFAULT SYSTEM CATEGORIES FOR SIDE MENU
 export const DEFAULT_CATEGORIES = [
+  { id: 'cat-heatpress', name: 'HEAT PRESS MACHINES', slug: 'heat-press-machines', description: 'Professional JUKE Commercial Heat Press Machines', enabled: true },
   { id: 'cat-womens', name: "Women's Collection", slug: 'womens-collection', description: 'Designer Maggam & Ethnic Blouse Transfers', enabled: true },
   { id: 'cat-mens', name: "Men's Collection", slug: 'mens-collection', description: 'Chest & Back Graphic Transfers', enabled: true },
   { id: 'cat-kids', name: "Kids Collection", slug: 'kids-collection', description: 'Cute Patches & Cartoon Transfers', enabled: true },
@@ -41,8 +42,64 @@ export const DEFAULT_CATEGORIES = [
 
 export const INITIAL_CATEGORIES = DEFAULT_CATEGORIES;
 
-// 16 DISTINCT PRODUCTION READY DTF PRODUCTS
+// PRODUCTION READY DTF PRODUCTS + JUKE HEAT PRESS MACHINES
 export const INITIAL_PRODUCTS = [
+  {
+    id: 'prod-juke-1624',
+    name: 'JUKE Heat Press Machine 16×24',
+    slug: 'juke-heat-press-machine-16x24',
+    categoryId: 'cat-heatpress',
+    category: 'HEAT PRESS MACHINES',
+    price: 25000,
+    offerPrice: 25000,
+    rating: 5.0,
+    stock: 50,
+    tags: ['juke', 'heatpress', 'machine', '16x24'],
+    status: 'Published',
+    enabled: true,
+    isTrending: true,
+    isBestSeller: true,
+    isPremium: true,
+    images: ['/images/juke_heat_press_16x24.png'],
+    description: 'Professional JUKE Heavy Duty 16x24 Commercial Heat Press Machine for DTF Printing. Features digital temperature & timer control, teflon-coated aluminium heating plate, uniform pressure distribution, and heavy-duty steel body.',
+    specifications: {
+      size: '16×24 Inches',
+      voltage: '220V 50Hz',
+      power: '2500W',
+      usage: 'Commercial DTF & Sublimation Heat Pressing',
+      tempRange: '0 - 399°C',
+      timerRange: '0 - 999 Seconds',
+      warranty: '1 Year Manufacturer Technical Support Warranty'
+    }
+  },
+  {
+    id: 'prod-juke-1632',
+    name: 'JUKE Heat Press Machine 16×32',
+    slug: 'juke-heat-press-machine-16x32',
+    categoryId: 'cat-heatpress',
+    category: 'HEAT PRESS MACHINES',
+    price: 30000,
+    offerPrice: 30000,
+    rating: 5.0,
+    stock: 50,
+    tags: ['juke', 'heatpress', 'machine', '16x32'],
+    status: 'Published',
+    enabled: true,
+    isTrending: true,
+    isBestSeller: true,
+    isPremium: true,
+    images: ['/images/juke_heat_press_16x32.png'],
+    description: 'Professional JUKE Extra Large 16x32 Heavy Duty Commercial Heat Press Machine. Designed for full meter gang sheet printing with digital timer, even heat retention, and industrial grade dual gas springs.',
+    specifications: {
+      size: '16×32 Inches',
+      voltage: '220V 50Hz',
+      power: '3200W',
+      usage: 'Heavy Duty Commercial DTF & Gang Sheet Pressing',
+      tempRange: '0 - 399°C',
+      timerRange: '0 - 999 Seconds',
+      warranty: '1 Year Manufacturer Technical Support Warranty'
+    }
+  },
   {
     id: 'prod-101',
     name: '3D Gold Zari Maggam Blouse Transfer Sheet (12x39)',
@@ -409,8 +466,11 @@ export const INITIAL_SETTINGS = {
   flashSaleEnabled: false,
   flashSaleEndTime: '',
   bannerEnabled: false,
-  seoTitle: 'HC DTF STORE - Premium DTF Sheets, Patches & Ethnic Blouse Transfers',
-  seoDescription: 'Order 1 Meter 22x39 & 12x39 DTF sheets, maggam blouse prints, gold zari saree borders & kids patches.',
+  heatPressSectionEnabled: true,
+  heatPressTitle: '🔥 JUKE HEAT PRESS MACHINES',
+  heatPressSubtitle: 'Professional Heavy Duty Heat Press Machines for Commercial DTF Printing',
+  seoTitle: 'HC DTF STORE - Premium DTF Sheets, Patches & JUKE Heat Press Machines',
+  seoDescription: 'Order 1 Meter 22x39 & 12x39 DTF sheets, maggam blouse prints, gold zari saree borders & JUKE Heat Press Machines 16x24 / 16x32.',
   googleAnalyticsId: ''
 };
 

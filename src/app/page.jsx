@@ -9,13 +9,16 @@ import HeroBanner from '@/components/home/HeroBanner';
 import AnimatedSearchBar from '@/components/home/AnimatedSearchBar';
 import FloatingCornerElements from '@/components/home/FloatingCornerElements';
 import ProductCard from '@/components/product/ProductCard';
+import HeatPressSection from '@/components/home/HeatPressSection';
 import WhyChooseUs from '@/components/home/WhyChooseUs';
 
 export default function HomePage() {
   const { products = [], categories = [] } = useStore();
 
-  // Published active products from single products database
-  const publishedProducts = (products || []).filter((p) => p.status !== 'Draft' && p.enabled !== false);
+  // Published active products from single products database (excluding Machinery from New Arrivals list)
+  const publishedProducts = (products || []).filter(
+    (p) => p.status !== 'Draft' && p.enabled !== false && p.categoryId !== 'cat-heatpress'
+  );
 
   const scrollRef = useRef(null);
 
@@ -42,7 +45,10 @@ export default function HomePage() {
       {/* 2. LARGE SEARCH BAR */}
       <AnimatedSearchBar />
 
-      {/* 3. FEATURED BANNER */}
+      {/* 3. JUKE HEAT PRESS MACHINES FEATURED SECTION */}
+      <HeatPressSection />
+
+      {/* 4. CUSTOM GANG SHEET BANNER */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-gradient-to-r from-slate-950 via-emerald-950 to-slate-950 text-white rounded-3xl p-8 sm:p-12 shadow-2xl border border-emerald-900/40 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-3 relative z-10 max-w-xl">
@@ -86,7 +92,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 4. NEW ARRIVALS */}
+      {/* 5. NEW ARRIVALS */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <div className="flex items-center justify-between border-b border-slate-200/80 pb-4">
           <div className="flex items-center gap-3">
@@ -135,7 +141,7 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* 5. COLLECTIONS */}
+      {/* 6. COLLECTIONS */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <div className="flex items-center justify-between border-b border-slate-200/80 pb-4">
           <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
@@ -167,7 +173,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 6. WHY CHOOSE US */}
+      {/* 7. WHY CHOOSE US */}
       <WhyChooseUs />
 
     </div>

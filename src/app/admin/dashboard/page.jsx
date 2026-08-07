@@ -14,7 +14,9 @@ import {
   ArrowUpRight,
   Package,
   Layers,
-  BarChart2
+  BarChart2,
+  Wrench,
+  Cpu
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import { 
@@ -30,7 +32,7 @@ import {
 } from 'recharts';
 
 export default function AdminDashboardPage() {
-  const { products, orders, customers, categories } = useStore();
+  const { products = [], orders = [], customers = [] } = useStore();
 
   // Dynamic Date Filters strictly from real Database Orders
   const now = new Date();
@@ -67,15 +69,27 @@ export default function AdminDashboardPage() {
 
   const averageOrderValue = orders.length > 0 ? Math.round(totalRevenue / orders.length) : 0;
 
-  // 3. Customers Calculations
+  // 3. Machinery Calculations (JUKE 16x24 and 16x32)
+  const heatPressProducts = products.filter(p => p.categoryId === 'cat-heatpress' || p.category === 'HEAT PRESS MACHINES');
+  const juke1624 = products.find(p => p.id === 'prod-juke-1624' || p.name?.includes('16×24'));
+  const juke1632 = products.find(p => p.id === 'prod-juke-1632' || p.name?.includes('16×32'));
+
+  let heatPressTotalSalesUnits = 0;
+  let heatPressTotalRevenue = 0;
+
+  orders.forEach(o => {
+    (o.items || []).forEach(item => {
+      if (item.category === 'HEAT PRESS MACHINES' || item.categoryId === 'cat-heatpress') {
+        heatPressTotalSalesUnits += (item.quantity || 1);
+        heatPressTotalRevenue += ((item.offerPrice || item.price) * (item.quantity || 1));
+      }
+    });
+  });
+
+  // 4. Customers Calculations
   const returningCustomersCount = customers.filter(c => (c.totalOrders || 0) > 1).length;
-  const totalLtvSum = customers.reduce((sum, c) => sum + (c.lifetimeValue || c.totalSpent || 0), 0);
-  const avgCustomerLtv = customers.length > 0 ? Math.round(totalLtvSum / customers.length) : 0;
 
-  // 4. Products & Stock Calculations
-  const lowStockProducts = products.filter((p) => (p.stock || 0) < 15);
-
-  // 5. Aggregate Product Sales from Real Database Orders
+  // 5. Aggregate Product Sales
   const productSalesMap = {};
   orders.forEach(o => {
     (o.items || []).forEach(item => {
@@ -91,7 +105,7 @@ export default function AdminDashboardPage() {
     .sort((a, b) => b.quantity - a.quantity)
     .slice(0, 4);
 
-  // 6. Aggregate Category Sales from Real Database Orders
+  // 6. Aggregate Category Sales
   const categorySalesMap = {};
   orders.forEach(o => {
     (o.items || []).forEach(item => {
@@ -136,7 +150,7 @@ export default function AdminDashboardPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
         <div>
           <h1 className="text-2xl sm:text-4xl font-black text-white">Executive Analytics Control Center</h1>
-          <p className="text-xs text-slate-400 mt-1">Real-time revenue metrics, order velocity & database financial calculations</p>
+          <p className="text-xs text-slate-400 mt-1">Real-time revenue metrics, JUKE Machinery sales & database financial calculations</p>
         </div>
 
         <div className="flex items-center gap-2 bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 px-3.5 py-1.5 rounded-full text-xs font-bold">
@@ -194,7 +208,46 @@ export default function AdminDashboardPage() {
 
       </div>
 
-      {/* 2. Orders & Customers Secondary Counter Grid */}
+      {/* 2. JUKE HEAT PRESS MACHINERY PERFORMANCE WIDGET */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 p-6 rounded-3xl border border-slate-800 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <Wrench size={20} className="text-emerald-400" />
+            <h3 className="text-base font-extrabold text-white">JUKE Heat Press Machinery Sales & Inventory Widget</h3>
+          </div>
+          <span className="text-xs font-bold text-emerald-400 bg-emerald-950 px-3 py-1 rounded-full border border-emerald-800">
+            Commercial Machinery Division
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-1">
+            <span className="text-[10px] text-slate-400 font-extrabold uppercase block">Units Sold</span>
+            <span className="text-2xl font-black text-white block">{heatPressTotalSalesUnits} Machines</span>
+            <span className="text-[10px] text-emerald-400 font-bold block">Total Machinery Orders</span>
+          </div>
+
+          <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-1">
+            <span className="text-[10px] text-slate-400 font-extrabold uppercase block">Machinery Revenue</span>
+            <span className="text-2xl font-black text-emerald-400 block">₹{heatPressTotalRevenue.toLocaleString()}</span>
+            <span className="text-[10px] text-slate-400 font-bold block">Gross Machine Sales</span>
+          </div>
+
+          <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-1">
+            <span className="text-[10px] text-slate-400 font-extrabold uppercase block">JUKE 16×24 Stock</span>
+            <span className="text-2xl font-black text-white block">{juke1624?.stock ?? 50} Units</span>
+            <span className="text-[10px] text-slate-400 font-bold block">₹{(juke1624?.price || 25000).toLocaleString()} per unit</span>
+          </div>
+
+          <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-1">
+            <span className="text-[10px] text-slate-400 font-extrabold uppercase block">JUKE 16×32 Stock</span>
+            <span className="text-2xl font-black text-white block">{juke1632?.stock ?? 50} Units</span>
+            <span className="text-[10px] text-slate-400 font-bold block">₹{(juke1632?.price || 30000).toLocaleString()} per unit</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Orders & Customers Secondary Counter Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         
         <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-1">
@@ -229,7 +282,7 @@ export default function AdminDashboardPage() {
 
       </div>
 
-      {/* 3. Real Charts Section */}
+      {/* 4. Real Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Revenue Graph */}
@@ -288,7 +341,7 @@ export default function AdminDashboardPage() {
 
       </div>
 
-      {/* 4. Products & Categories Sales Analytics */}
+      {/* 5. Products & Categories Sales Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Top Selling Products */}
