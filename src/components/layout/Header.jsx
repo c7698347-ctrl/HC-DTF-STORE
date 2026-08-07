@@ -15,18 +15,15 @@ import {
   Menu, 
   X, 
   Package, 
-  Clock, 
+  Truck, 
   LogOut, 
   Check,
-  Percent,
   Mic,
   PhoneCall,
-  ShieldCheck,
   Home as HomeIcon,
   Tag,
   Upload,
-  Settings as SettingsIcon,
-  SlidersHorizontal
+  Clock
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import { LANGUAGES } from '@/lib/i18n';
@@ -131,11 +128,11 @@ export default function Header() {
             </Link>
             <span className="text-slate-700">|</span>
             <div className="flex items-center gap-1">
-              <Clock size={13} className="text-emerald-400" />
-              <span>Same Day Dispatch</span>
+              <Truck size={13} className="text-emerald-400" />
+              <span>Fast Delivery</span>
             </div>
             <span className="text-slate-700">|</span>
-            <span>Support: {settings?.phone || '+91 8121635407'}</span>
+            <span>Support: +91 8121635407</span>
           </div>
         </div>
       </div>
