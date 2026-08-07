@@ -2,15 +2,14 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Heart, ShoppingBag, Eye, Star, Share2, Check, Copy } from 'lucide-react';
+import { Heart, ShoppingBag, Eye, Star, Share2, Check } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
 export default function ProductCard({ product }) {
   const { 
     addToCart, 
     wishlist, 
-    toggleWishlist, 
-    setQuickViewProduct
+    toggleWishlist
   } = useStore();
 
   const [copied, setCopied] = useState(false);
@@ -45,8 +44,8 @@ export default function ProductCard({ product }) {
   return (
     <div className="glass-card rounded-3xl overflow-hidden flex flex-col group relative border border-slate-200/80 bg-white hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300">
       
-      {/* Top Image Container */}
-      <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
+      {/* Top Image Container - Clicking Navigates Directly to Product Detail Page */}
+      <Link href={`/product/${product.slug || product.id}`} className="relative aspect-[4/3] bg-slate-100 overflow-hidden block">
         <img
           src={product.images?.[0] || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'}
           alt={product.name}
@@ -73,8 +72,6 @@ export default function ProductCard({ product }) {
 
         {/* Top Right Floating Action Icons: Wishlist & Share */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
-          
-          {/* Share Button */}
           <button
             onClick={handleShareProduct}
             className="p-2 rounded-full bg-white/80 text-slate-700 hover:bg-white hover:text-emerald-600 backdrop-blur-md transition shadow-sm"
@@ -83,9 +80,9 @@ export default function ProductCard({ product }) {
             {copied ? <Check size={15} className="text-emerald-600" /> : <Share2 size={15} />}
           </button>
 
-          {/* Wishlist Button */}
           <button
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               toggleWishlist(product);
             }}
@@ -98,23 +95,17 @@ export default function ProductCard({ product }) {
           >
             <Heart size={15} className={isWishlisted ? 'fill-current' : ''} />
           </button>
-
         </div>
 
-        {/* Quick View Hover Overlay */}
+        {/* Eye Hover Overlay - Directly Links to Product Page */}
         <div className="absolute inset-x-0 bottom-3 px-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-2 justify-end">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setQuickViewProduct(product);
-            }}
-            className="p-2 bg-slate-900/90 text-white text-xs font-bold rounded-xl backdrop-blur-sm flex items-center justify-center gap-1 hover:bg-slate-900 transition shadow-lg"
-            title="Quick View Details"
+          <span
+            className="p-2 bg-slate-900/90 text-white text-xs font-bold rounded-xl backdrop-blur-sm flex items-center justify-center gap-1 shadow-lg"
           >
-            <Eye size={16} />
-          </button>
+            <Eye size={16} /> View Details
+          </span>
         </div>
-      </div>
+      </Link>
 
       {/* Card Body */}
       <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
