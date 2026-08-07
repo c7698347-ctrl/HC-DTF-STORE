@@ -16,117 +16,67 @@ import {
   X,
   FileText,
   Clock3,
-  Package
+  Package,
+  Tag
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
-import { TRACKING_STAGES, COURIER_PARTNERS } from '@/lib/store';
+import { COURIER_PARTNERS } from '@/lib/store';
 import jsPDF from 'jspdf';
 
+const AMAZON_ORDER_STATUSES = [
+  'Ordered',
+  'Payment Confirmed',
+  'Printing Started',
+  'Printing Completed',
+  'Quality Check',
+  'Packed',
+  'Shipped',
+  'Arrived at Courier Hub',
+  'Out For Delivery',
+  'Delivered',
+  'Cancelled'
+];
+
 export default function AdminOrdersPage() {
-  const { orders, updateOrderTrackingDetails } = useStore();
+  const { orders = [], updateOrderStatus, updateOrderTrackingDetails } = useStore();
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Selected Order for Admin Tracking Controller Modal
   const [selectedOrder, setSelectedOrder] = useState(null);
 
-  // Edit Tracking Modal Form State
-  const [currentStageIndex, setCurrentStageIndex] = useState(0);
-  const [selectedCourierPartner, setSelectedCourierPartner] = useState('Blue Dart');
-  const [customCourierName, setCustomCourierName] = useState('');
+  // Edit Form State
+  const [orderStatus, setOrderStatus] = useState('Payment Confirmed');
+  const [selectedCourierPartner, setSelectedCourierPartner] = useState('Delhivery');
   const [trackingNumber, setTrackingNumber] = useState('');
-  const [courierWebsite, setCourierWebsite] = useState('');
-  const [shippingDate, setShippingDate] = useState('');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
-  const [deliveryTimeSlot, setDeliveryTimeSlot] = useState('');
-  const [dispatchNotes, setDispatchNotes] = useState('');
-  const [internalNotes, setInternalNotes] = useState('');
-  
-  // Delay states
-  const [isDelayed, setIsDelayed] = useState(false);
-  const [delayDays, setDelayDays] = useState(1);
-  const [delayReason, setDelayReason] = useState('');
-
-  // Timeline stage edits
-  const [timelineEdits, setTimelineEdits] = useState([]);
-
-  // Notification alert
   const [notificationMsg, setNotificationMsg] = useState('');
 
   const openTrackingEditor = (order) => {
     setSelectedOrder(order);
-    setCurrentStageIndex(order.currentStageIndex !== undefined ? order.currentStageIndex : 0);
-    
-    const matchPartner = COURIER_PARTNERS.find(c => c === order.courierName);
-    if (matchPartner) {
-      setSelectedCourierPartner(matchPartner);
-      setCustomCourierName('');
-    } else if (order.courierName) {
-      setSelectedCourierPartner('Other (Custom)');
-      setCustomCourierName(order.courierName);
-    } else {
-      setSelectedCourierPartner('Blue Dart');
-      setCustomCourierName('');
-    }
-
+    setOrderStatus(order.status || 'Payment Confirmed');
+    setSelectedCourierPartner(order.courierPartner || order.courierName || 'Delhivery');
     setTrackingNumber(order.trackingNumber || '');
-    setCourierWebsite(order.courierWebsite || '');
-    setShippingDate(order.shippingDate || '');
     setExpectedDeliveryDate(order.expectedDeliveryDate || '');
-    setDeliveryTimeSlot(order.deliveryTimeSlot || '');
-    setDispatchNotes(order.dispatchNotes || '');
-    setInternalNotes(order.internalNotes || '');
-    setIsDelayed(order.isDelayed || false);
-    setDelayDays(order.delayDays || 1);
-    setDelayReason(order.delayReason || '');
-
-    setTimelineEdits(order.timeline || TRACKING_STAGES.map((st) => ({ 
-      stageId: st.id, 
-      label: st.label, 
-      timestamp: 'Pending', 
-      status: st.desc, 
-      completed: false,
-      notes: '' 
-    })));
   };
 
   const handleSaveTracking = (e) => {
     e.preventDefault();
     if (!selectedOrder) return;
 
-    const finalCourierName = selectedCourierPartner === 'Other (Custom)' ? customCourierName : selectedCourierPartner;
+    updateOrderStatus(selectedOrder.id, orderStatus);
+    if (updateOrderTrackingDetails) {
+      updateOrderTrackingDetails(selectedOrder.id, {
+        courierPartner: selectedCourierPartner,
+        courierName: selectedCourierPartner,
+        trackingNumber,
+        expectedDeliveryDate
+      });
+    }
 
-    updateOrderTrackingDetails(selectedOrder.id, {
-      currentStageIndex: Number(currentStageIndex),
-      courierName: finalCourierName,
-      trackingNumber,
-      courierWebsite,
-      shippingDate,
-      expectedDeliveryDate,
-      deliveryTimeSlot,
-      dispatchNotes,
-      internalNotes,
-      isDelayed,
-      delayDays: Number(delayDays),
-      delayReason,
-      timeline: timelineEdits
-    });
-
-    setNotificationMsg(`Shipment & 9-stage tracking for Order #${selectedOrder.id} updated!`);
-    setTimeout(() => setNotificationMsg(''), 3000);
+    setNotificationMsg(`Order #${selectedOrder.id} status & tracking details updated live! Customer notified.`);
+    setTimeout(() => setNotificationMsg(''), 3500);
     setSelectedOrder(null);
-  };
-
-  const handleTimelineTimestampChange = (idx, newTime) => {
-    const updated = [...timelineEdits];
-    updated[idx].timestamp = newTime;
-    setTimelineEdits(updated);
-  };
-
-  const handleTimelineStatusChange = (idx, newStatus) => {
-    const updated = [...timelineEdits];
-    updated[idx].status = newStatus;
-    setTimelineEdits(updated);
   };
 
   const printInvoicePDF = (order) => {
@@ -136,17 +86,20 @@ export default function AdminOrdersPage() {
     doc.setFontSize(10);
     doc.text(`Invoice ID: INV-${order.id}`, 14, 30);
     doc.text(`Order Date: ${new Date(order.createdAt).toLocaleDateString()}`, 14, 36);
-    doc.text(`Store GSTIN: 36ABCDE1234F1Z5`, 14, 42);
 
-    doc.text(`Customer Name: ${order.customerName}`, 14, 52);
-    doc.text(`Email / Phone: ${order.customerEmail} | ${order.customerPhone}`, 14, 58);
-    doc.text(`Shipping Address: ${order.address}`, 14, 64);
+    doc.text(`Customer Name: ${order.customerName}`, 14, 50);
+    doc.text(`Email / Phone: ${order.email || order.customerEmail || ''} | ${order.phone || order.customerPhone || ''}`, 14, 56);
+    
+    if (order.shippingAddress) {
+      const addr = order.shippingAddress;
+      doc.text(`Shipping Address: ${addr.houseFlatNo}, ${addr.street}, ${addr.area}, ${addr.city}, ${addr.state} - ${addr.pincode}`, 14, 62);
+    }
 
     let y = 78;
-    doc.text('Line Items:', 14, y);
+    doc.text('Order Items:', 14, y);
     y += 8;
 
-    order.items.forEach((item, idx) => {
+    (order.items || []).forEach((item, idx) => {
       doc.text(`${idx + 1}. ${item.name} x ${item.quantity} = Rs.${(item.offerPrice || item.price) * item.quantity}`, 14, y);
       y += 6;
     });
@@ -154,22 +107,51 @@ export default function AdminOrdersPage() {
     y += 6;
     doc.text(`Subtotal: Rs.${order.subtotal}`, 14, y);
     y += 6;
-    doc.text(`GST (18%): Rs.${order.gst}`, 14, y);
-    y += 6;
-    doc.text(`Shipping Fee: Rs.${order.shipping}`, 14, y);
+    doc.text(`State Delivery Charge: Rs.${order.shippingFee || order.shipping || 0}`, 14, y);
     y += 8;
     doc.setFontSize(12);
     doc.text(`Total Amount Paid: Rs.${order.total}`, 14, y);
 
-    doc.save(`Tax_Invoice_${order.id}.pdf`);
+    doc.save(`Invoice_${order.id}.pdf`);
+  };
+
+  const printShippingLabelPDF = (order) => {
+    const doc = new jsPDF('portrait', 'mm', 'a6'); // A6 Shipping Label Format
+    doc.setFontSize(14);
+    doc.text('HC DTF STORE - EXPENSE SHIPPING LABEL', 8, 15);
+    doc.setFontSize(9);
+    doc.text(`Order ID: ${order.id}`, 8, 22);
+    doc.text(`Courier Partner: ${order.courierPartner || order.courierName || 'Standard Express'}`, 8, 27);
+    doc.text(`AWB / Tracking #: ${order.trackingNumber || 'PENDING'}`, 8, 32);
+
+    doc.setFontSize(10);
+    doc.text('SHIP TO:', 8, 42);
+    doc.setFontSize(11);
+    doc.text(`${order.customerName}`, 8, 48);
+    doc.setFontSize(9);
+    doc.text(`Phone: ${order.phone || order.customerPhone || ''}`, 8, 54);
+    
+    if (order.shippingAddress) {
+      const addr = order.shippingAddress;
+      doc.text(`${addr.houseFlatNo}, ${addr.street}`, 8, 60);
+      doc.text(`${addr.area}, ${addr.city}`, 8, 65);
+      doc.text(`${addr.state} - PIN: ${addr.pincode}`, 8, 70);
+    } else {
+      doc.text(`${order.address || ''}`, 8, 60);
+    }
+
+    doc.setFontSize(8);
+    doc.text('FROM: HC DTF STORE HQ, Plot #45, Textile Hub Road, Hyderabad, Telangana - 500081', 8, 85);
+
+    doc.save(`Shipping_Label_${order.id}.pdf`);
   };
 
   const filteredOrders = orders.filter((o) => {
     if (filterStatus !== 'All' && o.status !== filterStatus) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchId = o.id.toLowerCase().includes(q);
-      const matchCust = o.customerName.toLowerCase().includes(q);
+      const matchId = String(o.id).toLowerCase().includes(q);
+      const matchCust = (o.customerName || '').toLowerCase().includes(q);
       return matchId || matchCust;
     }
     return true;
@@ -181,20 +163,20 @@ export default function AdminOrdersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
         <div>
-          <h1 className="text-2xl sm:text-4xl font-black text-white">Full Logistics & Order Control Center</h1>
-          <p className="text-xs text-slate-400 mt-1">Assign Courier Partners, AWB numbers, optional tracking URLs & 9-stage pipeline</p>
+          <h1 className="text-2xl sm:text-4xl font-black text-white">Amazon-Style Orders & Dispatch Manager</h1>
+          <p className="text-xs text-slate-400 mt-1">Single source of truth for customer orders, status pipeline, courier partners & AWB shipping labels</p>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-400">Filter Stage:</span>
+          <span className="text-xs font-bold text-slate-400">Filter Status:</span>
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
             className="bg-slate-900 border border-slate-800 text-white text-xs rounded-xl px-3 py-2 font-bold focus:outline-none focus:border-emerald-500"
           >
             <option value="All">All Orders ({orders.length})</option>
-            {TRACKING_STAGES.map((st) => (
-              <option key={st.id} value={st.label}>{st.label}</option>
+            {AMAZON_ORDER_STATUSES.map((st) => (
+              <option key={st} value={st}>{st}</option>
             ))}
           </select>
         </div>
@@ -227,10 +209,10 @@ export default function AdminOrdersPage() {
             <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider font-bold text-[11px]">
               <tr>
                 <th className="p-4">Order ID & Date</th>
-                <th className="p-4">Customer</th>
-                <th className="p-4">Stage & Delay</th>
-                <th className="p-4">Assigned Courier & AWB</th>
-                <th className="p-4">Expected Delivery</th>
+                <th className="p-4">Customer Details</th>
+                <th className="p-4">Order Status</th>
+                <th className="p-4">Courier & AWB</th>
+                <th className="p-4">Total Amount</th>
                 <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -239,7 +221,7 @@ export default function AdminOrdersPage() {
                 <tr>
                   <td colSpan={6} className="p-12 text-center text-slate-500 font-bold space-y-2">
                     <Package size={36} className="mx-auto text-slate-700" />
-                    <p className="text-white font-extrabold text-sm">No orders yet.</p>
+                    <p className="text-white font-extrabold text-sm">No orders found.</p>
                     <p className="text-xs text-slate-500">Real customer orders placed on checkout will appear here.</p>
                   </td>
                 </tr>
@@ -253,38 +235,26 @@ export default function AdminOrdersPage() {
 
                     <td className="p-4">
                       <p className="font-bold text-white">{ord.customerName}</p>
-                      <p className="text-[11px] text-slate-500">{ord.customerPhone}</p>
+                      <p className="text-[11px] text-slate-400">{ord.phone || ord.customerPhone} • {ord.email || ord.customerEmail}</p>
                     </td>
 
-                    <td className="p-4 space-y-1">
+                    <td className="p-4">
                       <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold inline-block ${
                         ord.status === 'Delivered' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
                         ord.status === 'Shipped' || ord.status === 'Out For Delivery' ? 'bg-blue-950 text-blue-300 border border-blue-800' :
                         'bg-amber-950 text-amber-300 border border-amber-800'
                       }`}>
-                        {ord.status}
+                        {ord.status || 'Payment Verified'}
                       </span>
-
-                      {ord.isDelayed && (
-                        <span className="block text-[10px] text-rose-400 font-bold">
-                          ⚠️ Delayed by {ord.delayDays || 1} day
-                        </span>
-                      )}
                     </td>
 
                     <td className="p-4">
-                      {ord.courierName ? (
-                        <div>
-                          <p className="font-bold text-white">{ord.courierName}</p>
-                          <p className="text-[11px] font-mono text-emerald-400">{ord.trackingNumber || 'No AWB'}</p>
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-amber-400 font-bold">Unassigned (Preparing)</span>
-                      )}
+                      <p className="font-bold text-white">{ord.courierPartner || ord.courierName || 'Unassigned'}</p>
+                      <p className="text-[11px] font-mono text-emerald-400">{ord.trackingNumber || 'No AWB'}</p>
                     </td>
 
-                    <td className="p-4 font-bold text-slate-300">
-                      {ord.expectedDeliveryDate || '3-4 Days'}
+                    <td className="p-4 font-black text-white text-sm">
+                      ₹{ord.total?.toLocaleString()}
                     </td>
 
                     <td className="p-4 text-right">
@@ -292,15 +262,23 @@ export default function AdminOrdersPage() {
                         <button
                           onClick={() => openTrackingEditor(ord)}
                           className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center gap-1 transition text-xs shadow-md"
-                          title="Edit Courier & 9-Stage Tracking"
+                          title="Update Status & Tracking"
                         >
-                          <Edit3 size={14} /> Edit Logistics
+                          <Edit3 size={14} /> Update Status
+                        </button>
+
+                        <button
+                          onClick={() => printShippingLabelPDF(ord)}
+                          className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
+                          title="Print Shipping Label PDF"
+                        >
+                          <Tag size={14} />
                         </button>
 
                         <button
                           onClick={() => printInvoicePDF(ord)}
                           className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
-                          title="Print PDF Tax Invoice"
+                          title="Print Tax Invoice PDF"
                         >
                           <Printer size={14} />
                         </button>
@@ -314,49 +292,45 @@ export default function AdminOrdersPage() {
         </div>
       </div>
 
-      {/* FULL ADMIN LOGISTICS & TRACKING MODAL */}
+      {/* ADMIN STATUS & TRACKING MODAL */}
       {selectedOrder && (
         <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md" onClick={() => setSelectedOrder(null)} />
 
-          <div className="relative w-full max-w-3xl bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-white z-10 my-8 space-y-6 max-h-[90vh] overflow-y-auto">
+          <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-white z-10 space-y-6">
             
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
-                <h3 className="font-black text-lg text-white">Logistics & Tracking Controller - Order #{selectedOrder.id}</h3>
-                <p className="text-xs text-slate-400">Customer: {selectedOrder.customerName} ({selectedOrder.customerPhone})</p>
+                <h3 className="font-black text-lg text-white">Update Status & Tracking - Order #{selectedOrder.id}</h3>
+                <p className="text-xs text-slate-400">Customer: {selectedOrder.customerName}</p>
               </div>
               <button onClick={() => setSelectedOrder(null)} className="text-slate-400 hover:text-white">
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveTracking} className="space-y-6 text-xs">
+            <form onSubmit={handleSaveTracking} className="space-y-5 text-xs">
               
-              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
-                <label className="block text-slate-200 font-extrabold uppercase tracking-wider text-[11px]">
-                  Select Current Order Stage (1 to 9)
-                </label>
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">Order Status Pipeline *</label>
                 <select
-                  value={currentStageIndex}
-                  onChange={(e) => setCurrentStageIndex(Number(e.target.value))}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-bold text-xs focus:outline-none focus:border-emerald-500"
+                  value={orderStatus}
+                  onChange={(e) => setOrderStatus(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-white font-extrabold focus:outline-none focus:border-emerald-500"
                 >
-                  {TRACKING_STAGES.map((st, idx) => (
-                    <option key={st.id} value={idx}>
-                      Stage {idx + 1}: {st.label} - ({st.desc})
-                    </option>
+                  {AMAZON_ORDER_STATUSES.map((st) => (
+                    <option key={st} value={st}>{st}</option>
                   ))}
                 </select>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">Courier Partner *</label>
+                  <label className="block text-slate-300 font-bold mb-1.5">Courier Partner *</label>
                   <select
                     value={selectedCourierPartner}
                     onChange={(e) => setSelectedCourierPartner(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-white font-bold"
                   >
                     {COURIER_PARTNERS.map((c) => (
                       <option key={c} value={c}>{c}</option>
@@ -364,170 +338,43 @@ export default function AdminOrdersPage() {
                   </select>
                 </div>
 
-                {selectedCourierPartner === 'Other (Custom)' && (
-                  <div>
-                    <label className="block text-slate-300 font-bold mb-1">Enter Custom Courier Name *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Express Cargo"
-                      value={customCourierName}
-                      onChange={(e) => setCustomCourierName(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white"
-                    />
-                  </div>
-                )}
-
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">Tracking Number (AWB)</label>
+                  <label className="block text-slate-300 font-bold mb-1.5">Tracking Number (AWB)</label>
                   <input
                     type="text"
                     placeholder="e.g. AWB1049283"
                     value={trackingNumber}
                     onChange={(e) => setTrackingNumber(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Shipping Date</label>
-                  <input
-                    type="date"
-                    value={shippingDate}
-                    onChange={(e) => setShippingDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Expected Delivery Date</label>
-                  <input
-                    type="date"
-                    value={expectedDeliveryDate}
-                    onChange={(e) => setExpectedDeliveryDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Delivery Time Slot (Optional)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 10:00 AM - 02:00 PM"
-                    value={deliveryTimeSlot}
-                    onChange={(e) => setDeliveryTimeSlot(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-slate-300 font-bold mb-1">
-                    Courier Tracking URL (Optional - Shows 'Track Shipment' Button if Provided)
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://www.delhivery.com or leave blank to hide track button"
-                    value={courierWebsite}
-                    onChange={(e) => setCourierWebsite(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-white font-mono"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Customer Dispatch Notes</label>
-                  <input
-                    type="text"
-                    placeholder="Visible to customer on tracking page"
-                    value={dispatchNotes}
-                    onChange={(e) => setDispatchNotes(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Internal Admin Notes (Private)</label>
-                  <input
-                    type="text"
-                    placeholder="Internal store note"
-                    value={internalNotes}
-                    onChange={(e) => setInternalNotes(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white"
-                  />
-                </div>
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">Estimated Delivery Date</label>
+                <input
+                  type="date"
+                  value={expectedDeliveryDate}
+                  onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-white"
+                />
               </div>
 
-              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
-                <label className="flex items-center gap-2 cursor-pointer font-bold text-rose-400 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={isDelayed}
-                    onChange={(e) => setIsDelayed(e.target.checked)}
-                    className="w-4 h-4 text-rose-600 rounded"
-                  />
-                  <span>Mark Shipment as Delayed</span>
-                </label>
-
-                {isDelayed && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-1">Delay Days Count</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={delayDays}
-                        onChange={(e) => setDelayDays(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-1">Delay Reason</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Highway weather checkpost bottleneck"
-                        value={delayReason}
-                        onChange={(e) => setDelayReason(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-white"
-                      />
-                    </div>
-                  </div>
-                )}
+              <div className="pt-2 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrder(null)}
+                  className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl shadow-lg shadow-emerald-600/30 transition flex items-center gap-2"
+                >
+                  <Send size={16} /> Update & Notify Customer
+                </button>
               </div>
-
-              <div className="space-y-3 border-t border-slate-800 pt-4">
-                <label className="block text-slate-200 font-extrabold uppercase tracking-wider text-[11px]">
-                  Manual 9-Stage Timestamps & Stage Notes
-                </label>
-                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                  {timelineEdits.map((item, idx) => (
-                    <div key={idx} className="p-3 bg-slate-950 rounded-xl border border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <span className="font-bold text-white">{item.label}</span>
-                      <input
-                        type="text"
-                        placeholder="Timestamp (e.g. 10:30 AM)"
-                        value={item.timestamp}
-                        onChange={(e) => handleTimelineTimestampChange(idx, e.target.value)}
-                        className="bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-slate-200"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Stage note"
-                        value={item.status}
-                        onChange={(e) => handleTimelineStatusChange(idx, e.target.value)}
-                        className="bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-slate-200"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl text-xs shadow-xl transition flex items-center justify-center gap-2"
-              >
-                <Send size={16} /> Save & Update Customer Tracking Details
-              </button>
 
             </form>
 

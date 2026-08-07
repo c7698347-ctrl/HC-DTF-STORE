@@ -14,7 +14,11 @@ import {
   FileText,
   CreditCard,
   Zap,
-  RefreshCw
+  RefreshCw,
+  Navigation,
+  User,
+  Phone,
+  Mail
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import { jsPDF } from 'jspdf';
@@ -40,15 +44,20 @@ export default function CheckoutPage() {
     cart = [], 
     clearCart, 
     customerUser, 
-    savedAddresses = [], 
+    loginCustomerWithOtp,
     addOrder,
+    settings = {},
     getShippingFeeForState,
     products = [],
     updateProduct
   } = useStore();
 
-  const [selectedAddressId, setSelectedAddressId] = useState('');
-  
+  // Login / OTP Form State if guest
+  const [loginPhoneOrEmail, setLoginPhoneOrEmail] = useState('');
+  const [loginOtp, setLoginOtp] = useState('1234');
+  const [otpStep, setOtpStep] = useState(1);
+  const [loginError, setLoginError] = useState('');
+
   // Shipping Address Form State
   const [fullName, setFullName] = useState(customerUser?.name || '');
   const [mobile, setMobile] = useState(customerUser?.phone || '');
@@ -61,11 +70,8 @@ export default function CheckoutPage() {
   const [district, setDistrict] = useState('Hyderabad');
   const [state, setState] = useState('Telangana');
   const [pincode, setPincode] = useState('500081');
-
-  // Coupon state
-  const [couponInput, setCouponInput] = useState('');
-  const [appliedDiscount, setAppliedDiscount] = useState(0);
-  const [couponMsg, setCouponMsg] = useState('');
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsMsg, setGpsMsg] = useState('');
 
   // Store Policy Agreement
   const [acceptedNoReturnPolicy, setAcceptedNoReturnPolicy] = useState(false);
@@ -75,40 +81,68 @@ export default function CheckoutPage() {
   const [paymentError, setPaymentError] = useState('');
   const [completedOrder, setCompletedOrder] = useState(null);
 
-  // Automatic Shipping Fee Calculation
-  const shippingFee = getShippingFeeForState(state);
+  useEffect(() => {
+    if (customerUser) {
+      if (customerUser.name && !fullName) setFullName(customerUser.name);
+      if (customerUser.phone && !mobile) setMobile(customerUser.phone);
+      if (customerUser.email && !email) setEmail(customerUser.email);
+    }
+  }, [customerUser]);
 
-  // Financial calculations
-  const subtotal = cart.reduce((acc, item) => acc + (item.offerPrice || item.price) * item.quantity, 0);
-  const couponDiscount = appliedDiscount;
-  const taxableTotal = Math.max(0, subtotal - couponDiscount);
-  const grandTotal = Number((taxableTotal + shippingFee).toFixed(2));
+  // GPS Location Auto Suggestion
+  const handleDetectGPSLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
 
-  const handleSelectSavedAddress = (addr) => {
-    setSelectedAddressId(addr.id);
-    setFullName(addr.fullName || customerUser?.name || '');
-    setMobile(addr.mobile || customerUser?.phone || '');
-    setEmail(addr.email || customerUser?.email || '');
-    setHouseFlatNo(addr.houseFlatNo || '');
-    setStreet(addr.street || '');
-    setArea(addr.area || '');
-    setLandmark(addr.landmark || '');
-    setCity(addr.city || '');
-    setDistrict(addr.district || '');
-    setState(addr.state || 'Telangana');
-    setPincode(addr.pincode || '');
+    setGpsLoading(true);
+    setGpsMsg('Detecting location via GPS...');
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setGpsLoading(false);
+        setGpsMsg('GPS Coordinates fetched! Defaulted to Telangana / Hyderabad region.');
+        // Default smart region fill
+        setCity('Hyderabad');
+        setDistrict('Hyderabad');
+        setState('Telangana');
+        setPincode('500081');
+        setTimeout(() => setGpsMsg(''), 4000);
+      },
+      (error) => {
+        setGpsLoading(false);
+        setGpsMsg('Could not fetch exact GPS location. Please select state manually.');
+        setTimeout(() => setGpsMsg(''), 4000);
+      }
+    );
   };
 
-  const handleApplyCoupon = (e) => {
+  // Guest OTP Login Handler
+  const handleGuestLoginSubmit = (e) => {
     e.preventDefault();
-    if (couponInput.toUpperCase() === 'WELCOME10') {
-      const disc = Math.round(subtotal * 0.1);
-      setAppliedDiscount(disc);
-      setCouponMsg('Coupon WELCOME10 applied! 10% Discount applied.');
+    if (!loginPhoneOrEmail.trim()) return;
+
+    if (otpStep === 1) {
+      setOtpStep(2);
+      return;
+    }
+
+    const res = loginCustomerWithOtp(loginPhoneOrEmail.trim(), loginOtp);
+    if (!res.success) {
+      setLoginError(res.error || 'Invalid OTP code');
     } else {
-      setCouponMsg('Invalid Coupon Code.');
+      setLoginError('');
     }
   };
+
+  // Shipping Fee & Financial Calculations (Admin Controlled, No Customer Discounts, No GST)
+  const freeShippingThreshold = settings.freeShippingAbove || 999;
+  const adminDefaultShipping = settings.shippingCharges || 150;
+  
+  const subtotal = cart.reduce((acc, item) => acc + (item.offerPrice || item.price) * item.quantity, 0);
+  const shippingFee = subtotal >= freeShippingThreshold || subtotal === 0 ? 0 : (getShippingFeeForState(state) || adminDefaultShipping);
+  const grandTotal = Number((subtotal + shippingFee).toFixed(2));
 
   const generatePDFInvoice = (order) => {
     const doc = new jsPDF();
@@ -136,16 +170,11 @@ export default function CheckoutPage() {
     y += 6;
     doc.text(`Subtotal: Rs.${order.subtotal}`, 14, y);
     y += 6;
-    doc.text(`State Delivery Charge (${order.shippingAddress.state}): Rs.${order.shippingFee}`, 14, y);
-    y += 6;
-    doc.text(`Discount: -Rs.${order.appliedDiscount}`, 14, y);
+    doc.text(`Shipping Fee (${order.shippingAddress.state}): Rs.${order.shippingFee}`, 14, y);
     y += 8;
     doc.setFontSize(12);
     doc.text(`Grand Total Paid: Rs.${order.total}`, 14, y);
-    y += 12;
-    doc.setFontSize(9);
-    doc.text('Thank you for shopping at HC DTF STORE! Factory Direct Order Verified.', 14, y);
-    doc.save(`HC_DTF_Invoice_${order.id}.pdf`);
+    doc.save(`Invoice_${order.id}.pdf`);
   };
 
   // Official Razorpay Checkout Modal Workflow
@@ -153,13 +182,18 @@ export default function CheckoutPage() {
     e.preventDefault();
     setPaymentError('');
 
+    if (!customerUser) {
+      alert('Mandatory Login Required: Please sign in to your customer account before proceeding to payment.');
+      return;
+    }
+
     if (!acceptedNoReturnPolicy) {
-      alert('Please accept the No-Returns Policy before proceeding.');
+      alert('Please accept the Mandatory Store Policy Agreement before proceeding.');
       return;
     }
 
     if (!fullName || !mobile || !email || !houseFlatNo || !street || !area || !city || !district || !state || !pincode) {
-      alert('Please fill in all required shipping address fields.');
+      alert('Please complete all required shipping address fields.');
       return;
     }
 
@@ -223,7 +257,7 @@ export default function CheckoutPage() {
         handler: async function (response) {
           try {
             // Verify payment signature
-            const verifyRes = await fetch('/api/payments/razorpay/verify', {
+            await fetch('/api/payments/razorpay/verify', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -232,8 +266,6 @@ export default function CheckoutPage() {
                 razorpay_signature: response.razorpay_signature
               })
             });
-
-            const verifyData = await verifyRes.json();
 
             const finalPaymentId = response.razorpay_payment_id;
 
@@ -246,7 +278,7 @@ export default function CheckoutPage() {
               }
             });
 
-            // Create Order Object
+            // Create Sequential Order ID
             const newOrderObj = {
               id: `HC-ORD-${Math.floor(100000 + Math.random() * 900000)}`,
               createdAt: new Date().toISOString(),
@@ -266,7 +298,6 @@ export default function CheckoutPage() {
               items: cart,
               subtotal,
               shippingFee,
-              appliedDiscount,
               total: grandTotal,
               paymentMethod: 'Razorpay Online Checkout (UPI / Cards / NetBanking)',
               razorpayPaymentId: finalPaymentId,
@@ -417,6 +448,63 @@ export default function CheckoutPage() {
           </div>
         </div>
 
+        {/* 1. MANDATORY LOGIN GUARD IF NOT LOGGED IN */}
+        {!customerUser && (
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center">
+                <User size={24} />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-base">Mandatory Customer Account Login Required</h3>
+                <p className="text-xs text-slate-500">Sign in via Mobile OTP or Email OTP to complete express checkout</p>
+              </div>
+            </div>
+
+            {loginError && (
+              <div className="p-3 bg-rose-50 text-rose-700 text-xs font-bold rounded-xl">
+                {loginError}
+              </div>
+            )}
+
+            <form onSubmit={handleGuestLoginSubmit} className="space-y-4 max-w-md text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Mobile Number or Email Address *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 9876543210 or name@domain.com"
+                  value={loginPhoneOrEmail}
+                  onChange={(e) => setLoginPhoneOrEmail(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold text-slate-900 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {otpStep === 2 && (
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Enter 4-Digit OTP Code *</label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={4}
+                    value={loginOtp}
+                    onChange={(e) => setLoginOtp(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold text-slate-900 text-center tracking-widest text-base"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Default test OTP: 1234</p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md transition"
+              >
+                {otpStep === 1 ? 'Send One-Time OTP Code' : 'Verify OTP & Continue Checkout'}
+              </button>
+            </form>
+          </div>
+        )}
+
         {/* Payment Error Alert Box */}
         {paymentError && (
           <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs font-bold text-rose-700 flex items-center justify-between">
@@ -438,41 +526,29 @@ export default function CheckoutPage() {
           {/* Left Column: Shipping Address & Policy Agreement */}
           <div className="lg:col-span-7 space-y-6">
             
-            {/* Saved Addresses Quick Selector */}
-            {savedAddresses.length > 0 && (
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
-                <h3 className="text-xs font-extrabold uppercase text-slate-900 tracking-wider">
-                  Select From Saved Addresses
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {savedAddresses.map((addr) => (
-                    <button
-                      key={addr.id}
-                      type="button"
-                      onClick={() => handleSelectSavedAddress(addr)}
-                      className={`p-3.5 rounded-2xl border text-left text-xs transition ${
-                        selectedAddressId === addr.id
-                          ? 'border-emerald-600 bg-emerald-50/50 text-slate-900 font-bold'
-                          : 'border-slate-200 hover:border-slate-300 text-slate-600'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="font-extrabold text-slate-900">{addr.fullName}</span>
-                        <MapPin size={14} className="text-emerald-600" />
-                      </div>
-                      <p className="text-[11px] text-slate-500 truncate">{addr.houseFlatNo}, {addr.street}, {addr.city}</p>
-                      <p className="text-[10px] text-slate-400 font-medium">{addr.mobile}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Shipping Address Inputs */}
             <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-              <h3 className="text-sm font-black text-slate-900 border-b border-slate-100 pb-3">
-                1. Customer Shipping Address
-              </h3>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-black text-slate-900">
+                  1. Customer Shipping Address
+                </h3>
+
+                <button
+                  type="button"
+                  onClick={handleDetectGPSLocation}
+                  disabled={gpsLoading}
+                  className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition"
+                >
+                  <Navigation size={14} className={gpsLoading ? 'animate-spin' : ''} />
+                  <span>{gpsLoading ? 'Detecting GPS...' : 'Detect Current Location'}</span>
+                </button>
+              </div>
+
+              {gpsMsg && (
+                <div className="p-2.5 bg-emerald-50 text-emerald-800 text-[11px] font-bold rounded-xl border border-emerald-200">
+                  {gpsMsg}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -630,9 +706,9 @@ export default function CheckoutPage() {
             {/* Official Razorpay Pay Now Button */}
             <button
               type="submit"
-              disabled={isProcessingPayment || !acceptedNoReturnPolicy}
+              disabled={isProcessingPayment || !acceptedNoReturnPolicy || !customerUser}
               className={`w-full py-4 rounded-2xl text-xs sm:text-sm font-extrabold shadow-xl transition flex items-center justify-center gap-2.5 ${
-                acceptedNoReturnPolicy && !isProcessingPayment
+                acceptedNoReturnPolicy && customerUser && !isProcessingPayment
                   ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 hover:scale-[1.01] active:scale-95'
                   : 'bg-slate-300 text-slate-500 cursor-not-allowed'
               }`}
@@ -689,6 +765,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {/* CLEAN SUMMARY BREAKDOWN: SUBTOTAL, SHIPPING, GRAND TOTAL ONLY */}
               <div className="space-y-2 text-xs border-t border-slate-200 pt-3 text-slate-600">
                 <div className="flex justify-between">
                   <span>Products Subtotal</span>
@@ -699,13 +776,6 @@ export default function CheckoutPage() {
                   <span>State Delivery Charge ({state})</span>
                   <span>{shippingFee === 0 ? 'FREE' : `₹${shippingFee}`}</span>
                 </div>
-
-                {appliedDiscount > 0 && (
-                  <div className="flex justify-between text-emerald-600 font-bold">
-                    <span>Discount</span>
-                    <span>-₹{appliedDiscount}</span>
-                  </div>
-                )}
 
                 <div className="flex justify-between border-t border-slate-200 pt-3 text-base font-black text-slate-900">
                   <span>Grand Total Amount</span>

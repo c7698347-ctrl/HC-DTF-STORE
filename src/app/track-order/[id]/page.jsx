@@ -8,7 +8,6 @@ import {
   Truck, 
   CheckCircle2, 
   Clock, 
-  Calendar, 
   ExternalLink, 
   FileText, 
   ArrowLeft, 
@@ -16,19 +15,35 @@ import {
   MapPin, 
   Phone, 
   ShieldCheck,
-  Clock3
+  Clock3,
+  Check,
+  RefreshCw,
+  Building,
+  Sparkles
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
-import { TRACKING_STAGES } from '@/lib/store';
 import jsPDF from 'jspdf';
+
+const AMAZON_TRACKING_STAGES = [
+  { id: 'ordered', label: 'Ordered', desc: 'Order placed & submitted' },
+  { id: 'payment_confirmed', label: 'Payment Confirmed', desc: 'Verified via Razorpay' },
+  { id: 'printing_started', label: 'Printing Started', desc: '2400 DPI Printing queued' },
+  { id: 'printing_completed', label: 'Printing Completed', desc: 'Printing finished' },
+  { id: 'quality_check', label: 'Quality Check', desc: 'Inspected before packing' },
+  { id: 'packed', label: 'Packed', desc: 'Safely packed in roll cylinder' },
+  { id: 'shipped', label: 'Shipped', desc: 'Handed to courier partner' },
+  { id: 'courier_hub', label: 'Arrived at Hub', desc: 'In transit at destination hub' },
+  { id: 'out_for_delivery', label: 'Out For Delivery', desc: 'With local courier agent' },
+  { id: 'delivered', label: 'Delivered', desc: 'Handed over to customer' }
+];
 
 export default function OrderTrackingDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { orders, settings } = useStore();
+  const { orders = [], settings = {} } = useStore();
 
   const orderId = params.id;
-  const order = orders.find((o) => o.id.toUpperCase() === orderId?.toUpperCase());
+  const order = orders.find((o) => String(o.id).toUpperCase() === String(orderId)?.toUpperCase());
 
   if (!order) {
     return (
@@ -38,18 +53,15 @@ export default function OrderTrackingDetailPage() {
           <h2 className="text-2xl font-black text-slate-900">Order #{orderId} Not Found</h2>
           <p className="text-xs text-slate-500">Please check your Order ID or contact support.</p>
           <button
-            onClick={() => router.push('/track-order')}
+            onClick={() => router.push('/account?tab=orders')}
             className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-2xl transition"
           >
-            Back to Order Search
+            Back to My Orders
           </button>
         </div>
       </div>
     );
   }
-
-  const hasCourierAssigned = Boolean(order.courierName || order.trackingNumber);
-  const hasTrackingUrl = Boolean(order.courierWebsite);
 
   const generatePDFInvoice = () => {
     const doc = new jsPDF();
@@ -58,17 +70,15 @@ export default function OrderTrackingDetailPage() {
     doc.setFontSize(10);
     doc.text(`Invoice ID: INV-${order.id}`, 14, 30);
     doc.text(`Order Date: ${new Date(order.createdAt).toLocaleDateString()}`, 14, 36);
-    doc.text(`GSTIN: ${settings?.gstNumber || '36ABCDE1234F1Z5'}`, 14, 42);
 
-    doc.text(`Customer Name: ${order.customerName}`, 14, 52);
-    doc.text(`Email / Phone: ${order.customerEmail} | ${order.customerPhone}`, 14, 58);
-    doc.text(`Shipping Address: ${order.address}`, 14, 64);
+    doc.text(`Customer Name: ${order.customerName}`, 14, 46);
+    doc.text(`Email / Phone: ${order.email || order.customerEmail || ''} | ${order.phone || order.customerPhone || ''}`, 14, 52);
 
-    let y = 78;
+    let y = 66;
     doc.text('Line Items:', 14, y);
     y += 8;
 
-    order.items.forEach((item, index) => {
+    (order.items || []).forEach((item, index) => {
       doc.text(`${index + 1}. ${item.name} x ${item.quantity} = Rs.${(item.offerPrice || item.price) * item.quantity}`, 14, y);
       y += 6;
     });
@@ -76,23 +86,30 @@ export default function OrderTrackingDetailPage() {
     y += 6;
     doc.text(`Subtotal: Rs.${order.subtotal}`, 14, y);
     y += 6;
-    doc.text(`GST (18%): Rs.${order.gst}`, 14, y);
-    y += 6;
-    doc.text(`Shipping Charges: Rs.${order.shipping}`, 14, y);
+    doc.text(`State Delivery Charge: Rs.${order.shippingFee || order.shipping || 0}`, 14, y);
     y += 8;
     doc.setFontSize(12);
-    doc.text(`Total Amount Paid: Rs.${order.total}`, 14, y);
+    doc.text(`Grand Total Paid: Rs.${order.total}`, 14, y);
 
-    doc.save(`Tax_Invoice_${order.id}.pdf`);
+    doc.save(`Invoice_${order.id}.pdf`);
   };
 
-  const timelineList = order.timeline?.length > 0 ? order.timeline : TRACKING_STAGES.map((st, idx) => ({
-    stageId: st.id,
-    label: st.label,
-    timestamp: idx <= (order.currentStageIndex || 0) ? new Date().toLocaleString() : 'Pending',
-    status: st.desc,
-    completed: idx <= (order.currentStageIndex || 0)
-  }));
+  // Determine current stage index
+  const getStageIdx = (statusStr = '') => {
+    const s = statusStr.toLowerCase();
+    if (s.includes('delivered')) return 9;
+    if (s.includes('out for delivery')) return 8;
+    if (s.includes('hub') || s.includes('arrived')) return 7;
+    if (s.includes('shipped')) return 6;
+    if (s.includes('packed') || s.includes('packing')) return 5;
+    if (s.includes('quality')) return 4;
+    if (s.includes('printing completed')) return 3;
+    if (s.includes('printing')) return 2;
+    if (s.includes('verified') || s.includes('paid')) return 1;
+    return 0; // Ordered
+  };
+
+  const currentIdx = getStageIdx(order.status);
 
   return (
     <div className="py-12 bg-slate-50 min-h-screen">
@@ -115,83 +132,63 @@ export default function OrderTrackingDetailPage() {
           </button>
         </div>
 
-        {/* Prominent Delivery Header Banner */}
+        {/* Delivery Header Banner */}
         <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <span className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-400">
-                Official Live Shipment Tracker
+                Official Amazon-Style Live Tracker
               </span>
               <h1 className="text-2xl sm:text-4xl font-black text-white mt-1">Order #{order.id}</h1>
               <p className="text-xs text-slate-300 mt-1">Placed on {new Date(order.createdAt).toLocaleDateString()}</p>
             </div>
 
             <div className="bg-white/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/20 text-right space-y-0.5">
-              <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block">Estimated Delivery Date</span>
+              <span className="text-[10px] font-bold text-emerald-300 uppercase tracking-wider block">Estimated Delivery</span>
               <span className="text-xl sm:text-2xl font-black text-white">
-                {order.expectedDeliveryDate || '3-4 Days'}
+                {order.expectedDeliveryDate || '3-4 Business Days'}
               </span>
-              {order.deliveryTimeSlot && (
-                <span className="text-[11px] text-emerald-200 font-bold block">Slot: {order.deliveryTimeSlot}</span>
-              )}
             </div>
           </div>
-
-          {order.isDelayed && (
-            <div className="p-4 bg-rose-950/90 border border-rose-700 text-rose-200 rounded-2xl text-xs font-bold flex items-center gap-3">
-              <AlertTriangle size={20} className="text-rose-400 shrink-0" />
-              <div>
-                <span className="text-rose-100 font-black block">Delayed by {order.delayDays || 1} Day(s)</span>
-                <span className="text-rose-300">{order.delayReason || 'Transit route weather checkpost bottleneck'}</span>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* HORIZONTAL 9-STAGE PROGRESS TRACKER */}
+        {/* AMAZON 10-STAGE HORIZONTAL TIMELINE */}
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
           <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-900 flex items-center gap-2">
             <Package size={18} className="text-emerald-600" />
-            9-Stage Production & Factory Dispatch Progress
+            10-Stage Order & Shipment Progress
           </h2>
 
           <div className="overflow-x-auto pb-4">
-            <div className="min-w-[900px] flex items-center justify-between relative px-4">
+            <div className="min-w-[1000px] flex items-center justify-between relative px-4">
               
-              {/* Background Connecting Line */}
-              <div className="absolute left-8 right-8 top-5 h-1 bg-slate-200 -z-0" />
-
-              {/* Progress Line Filler */}
+              {/* Line Filler */}
               <div 
                 className="absolute left-8 h-1 bg-emerald-600 transition-all duration-500 -z-0"
                 style={{
-                  width: `${((order.currentStageIndex || 0) / (TRACKING_STAGES.length - 1)) * 94}%`
+                  width: `${(currentIdx / (AMAZON_TRACKING_STAGES.length - 1)) * 94}%`
                 }}
               />
 
-              {/* 9 Stages Dots */}
-              {TRACKING_STAGES.map((st, idx) => {
-                const isCompleted = idx <= (order.currentStageIndex || 0);
-                const isCurrent = idx === (order.currentStageIndex || 0);
+              {/* 10 Stages */}
+              {AMAZON_TRACKING_STAGES.map((st, idx) => {
+                const isPassed = idx <= currentIdx;
+                const isCurrent = idx === currentIdx;
 
                 return (
-                  <div key={st.id} className="relative z-10 flex flex-col items-center text-center max-w-[95px]">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-extrabold text-xs transition ${
-                      isCompleted 
+                  <div key={st.id} className="relative z-10 flex flex-col items-center text-center max-w-[90px]">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-extrabold text-[11px] transition ${
+                      isPassed 
                         ? 'bg-emerald-600 text-white ring-4 ring-emerald-100 shadow-md' 
                         : 'bg-white border-2 border-slate-300 text-slate-400'
-                    }`}>
-                      {isCompleted ? <CheckCircle2 size={20} /> : idx + 1}
+                    } ${isCurrent ? 'scale-110 ring-4 ring-emerald-300' : ''}`}>
+                      {isPassed ? <Check size={14} /> : idx + 1}
                     </div>
 
-                    <p className={`text-[11px] font-extrabold mt-3 leading-tight ${
-                      isCurrent ? 'text-emerald-700' : isCompleted ? 'text-slate-900' : 'text-slate-400'
+                    <p className={`text-[10px] font-extrabold mt-2 leading-tight ${
+                      isCurrent ? 'text-emerald-700' : isPassed ? 'text-slate-900' : 'text-slate-400'
                     }`}>
                       {st.label}
-                    </p>
-
-                    <p className="text-[10px] text-slate-400 font-medium mt-1">
-                      {timelineList[idx]?.timestamp !== 'Pending' ? timelineList[idx]?.timestamp : ''}
                     </p>
                   </div>
                 );
@@ -201,96 +198,60 @@ export default function OrderTrackingDetailPage() {
           </div>
         </div>
 
-        {/* COURIER DISPATCH CARD */}
-        {!hasCourierAssigned ? (
-          /* Case 1: Admin has NOT assigned courier yet */
-          <div className="bg-amber-50/80 border border-amber-200 p-6 sm:p-8 rounded-3xl text-xs text-amber-900 flex items-center gap-4 shadow-sm">
-            <Clock3 size={24} className="text-amber-600 shrink-0" />
-            <div>
-              <h3 className="font-extrabold text-amber-950 text-sm mb-1">Dispatch Preparation in Progress</h3>
-              <p className="font-medium leading-relaxed">
-                Your order is currently being prepared for dispatch. Courier details will appear once your order has been shipped.
-              </p>
-            </div>
-          </div>
-        ) : (
-          /* Case 2: Admin HAS assigned courier details */
-          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Truck size={18} className="text-emerald-600" />
-              Logistics & Courier Partner Information
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Courier Partner</span>
-                <span className="font-extrabold text-slate-900 text-sm mt-0.5 block">{order.courierName}</span>
-              </div>
-
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">AWB Tracking Number</span>
-                <span className="font-mono font-black text-emerald-700 text-sm mt-0.5 block">
-                  {order.trackingNumber || 'Pending'}
-                </span>
-              </div>
-
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Shipping Date</span>
-                <span className="font-extrabold text-slate-900 text-sm mt-0.5 block">
-                  {order.shippingDate || 'Pending'}
-                </span>
-              </div>
-
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Expected Delivery Date</span>
-                <span className="font-extrabold text-emerald-700 text-sm mt-0.5 block">
-                  {order.expectedDeliveryDate || 'Pending'}
-                </span>
-              </div>
-            </div>
-
-            {/* Track Shipment External Button (Visible ONLY if tracking URL exists) */}
-            {hasTrackingUrl && (
-              <div className="pt-2">
-                <a
-                  href={order.courierWebsite}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-2xl transition shadow-md"
-                >
-                  <span>Track Shipment ({order.courierName})</span>
-                  <ExternalLink size={16} />
-                </a>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Chronological Activity Feed */}
-        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-          <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
-            Detailed Activity Timeline Log
+        {/* LOGISTICS & COURIER PARTNER INFO */}
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+            <Truck size={18} className="text-emerald-600" />
+            Courier & Shipping Details
           </h3>
 
-          <div className="space-y-6 relative pl-6 border-l-2 border-slate-200 ml-2">
-            {timelineList.map((item, idx) => (
-              <div key={idx} className="relative group">
-                <div className={`absolute -left-[31px] top-0 w-4 h-4 rounded-full border-2 border-white ${
-                  item.completed ? 'bg-emerald-600' : 'bg-slate-300'
-                }`} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block">Courier Partner</span>
+              <span className="font-extrabold text-slate-900 text-sm mt-0.5 block">{order.courierPartner || 'Delhivery / DTDC'}</span>
+            </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-slate-900 text-xs sm:text-sm">{item.label}</span>
-                    {item.timestamp !== 'Pending' && (
-                      <span className="text-[11px] font-bold text-slate-400">({item.timestamp})</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-600 font-medium">{item.status}</p>
-                  {item.notes && (
-                    <p className="text-[11px] text-slate-400 italic">Note: {item.notes}</p>
-                  )}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block">AWB Tracking Number</span>
+              <span className="font-mono font-black text-emerald-700 text-sm mt-0.5 block">
+                {order.trackingNumber || 'Assigned upon dispatch'}
+              </span>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block">Customer Name</span>
+              <span className="font-extrabold text-slate-900 text-sm mt-0.5 block">
+                {order.customerName}
+              </span>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block">Contact Phone</span>
+              <span className="font-extrabold text-slate-900 text-sm mt-0.5 block">
+                {order.phone || order.customerPhone}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ORDER ITEMS GALLERY */}
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">Order Line Items</h3>
+          <div className="space-y-3">
+            {(order.items || []).map((item) => (
+              <div key={item.id} className="flex items-center gap-4 py-2 border-b border-slate-100 last:border-b-0">
+                <img
+                  src={item.images?.[0] || item.image || '/images/juke_heat_press_16x24.png'}
+                  alt={item.name}
+                  className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-bold text-slate-900 text-xs sm:text-sm truncate">{item.name}</h4>
+                  <p className="text-xs text-slate-500 font-medium">Quantity: {item.quantity} × ₹{item.offerPrice || item.price}</p>
                 </div>
+                <span className="font-extrabold text-slate-900 text-xs sm:text-sm">
+                  ₹{((item.offerPrice || item.price) * item.quantity).toLocaleString()}
+                </span>
               </div>
             ))}
           </div>
