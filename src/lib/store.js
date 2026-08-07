@@ -15,8 +15,8 @@ export const COURIER_PARTNERS = [
 ];
 
 export const TRACKING_STAGES = [
-  { id: 'placed', label: 'Order Placed', desc: 'Order details received in system' },
-  { id: 'payment_confirmed', label: 'Payment Confirmed', desc: 'Prepaid transaction verified' },
+  { id: 'placed', label: 'Order Placed', desc: 'Order & Manual UPI payment proof submitted' },
+  { id: 'payment_confirmed', label: 'Payment Verified', desc: 'UPI UTR transaction verified in bank ledger' },
   { id: 'printing_started', label: 'Printing Started', desc: '2400 DPI High-Density DTF roll printing in progress' },
   { id: 'printing_completed', label: 'Printing Completed', desc: 'Gang roll print finished & dried' },
   { id: 'qc', label: 'Quality Check', desc: 'TPU powder curing & color depth optical test passed' },
@@ -71,6 +71,10 @@ export const INITIAL_SETTINGS = {
   phone: '+91 98765 43210',
   email: 'support@hcdtfstore.com',
   address: 'HC DTF STORE HQ, Plot #45, Textile Hub Road, Hyderabad, Telangana, India - 500081',
+  upiAccountName: 'HC DTF STORE (Hima Bindu)',
+  upiId: 'hcdtfstore@upi',
+  upiMobile: '+91 98765 43210',
+  upiQrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi%3A%2F%2Fpay%3Fpa%3Dhcdtfstore%40upi%26pn%3DHC%2520DTF%2520STORE%26cu%3DINR',
   socialLinks: {
     instagram: '',
     facebook: '',

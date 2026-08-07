@@ -6,11 +6,9 @@
     "categoryId": "cat-independence",
     "category": "Independence",
     "subcategory": "General",
-    "tags": [
-      "flag"
-    ],
+    "tags": "flag",
     "price": 500,
-    "offerPrice": 6887,
+    "offerPrice": 1,
     "discountPercent": -1277,
     "stock": 100,
     "description": "",
@@ -25,6 +23,7 @@
     "isPremium": true,
     "rating": 5,
     "reviewCount": 1,
-    "createdAt": "2026-08-06T17:28:25.780Z"
+    "createdAt": "2026-08-06T17:28:25.780Z",
+    "categoryName": "Independence"
   }
 ]

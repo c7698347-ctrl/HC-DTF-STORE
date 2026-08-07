@@ -95,6 +95,9 @@ export function StoreProvider({ children }) {
 
       const savedWishlist = localStorage.getItem('hc_dtf_wishlist');
       if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
+
+      const savedSettings = localStorage.getItem('hc_dtf_settings');
+      if (savedSettings) setSettings(JSON.parse(savedSettings));
     } catch (e) {
       console.error('LocalStorage load error', e);
     }
@@ -119,6 +122,10 @@ export function StoreProvider({ children }) {
   useEffect(() => {
     localStorage.setItem('hc_dtf_wishlist', JSON.stringify(wishlist));
   }, [wishlist]);
+
+  useEffect(() => {
+    localStorage.setItem('hc_dtf_settings', JSON.stringify(settings));
+  }, [settings]);
 
   // Helper i18n Translation getter
   const t = (key) => getTranslation(currentLanguage, key);
@@ -414,66 +421,19 @@ export function StoreProvider({ children }) {
     });
   };
 
-  // ================= FLASH SALE MANAGER =================
-  const createFlashSale = (data) => {
-    setFlashSale((prev) => ({
-      ...prev,
-      ...data,
-      enabled: true
-    }));
-  };
-
-  const duplicateFlashSale = () => {
-    const newHistoryItem = {
-      id: `fs-${Date.now()}`,
-      title: flashSale.title,
-      orders: flashSale.ordersCount || 0,
-      revenue: flashSale.totalRevenue || 0,
-      date: new Date().toISOString().split('T')[0]
-    };
-    setFlashSale((prev) => ({
-      ...prev,
-      title: `${prev.title} (Clone)`,
-      ordersCount: 0,
-      totalRevenue: 0,
-      history: [newHistoryItem, ...(prev.history || [])]
-    }));
-  };
-
-  // ================= ORDER TRACKING MANAGER =================
-  const updateOrderTrackingDetails = (orderId, updates) => {
-    setOrders((prev) =>
-      prev.map((ord) => {
-        if (ord.id === orderId) {
-          const currentStageIndex = updates.currentStageIndex !== undefined ? updates.currentStageIndex : ord.currentStageIndex;
-          const statusLabel = TRACKING_STAGES[currentStageIndex]?.label || ord.status;
-
-          const updatedTimeline = (updates.timeline || ord.timeline || []).map((st, idx) => ({
-            ...st,
-            completed: idx <= currentStageIndex,
-            timestamp: idx === currentStageIndex ? (st.timestamp === 'Pending' ? new Date().toLocaleString() : st.timestamp) : st.timestamp
-          }));
-
-          return {
-            ...ord,
-            ...updates,
-            currentStageIndex,
-            status: statusLabel,
-            timeline: updatedTimeline
-          };
-        }
-        return ord;
-      })
-    );
-  };
-
+  // ================= MANUAL UPI PAYMENT & ORDER CONTROLLER =================
   const createOrder = (orderData) => {
     const newOrd = {
       id: `HC-ORD-${Math.floor(1000 + Math.random() * 9000)}`,
       createdAt: new Date().toISOString(),
       currentStageIndex: 0,
-      status: 'Order Placed',
-      paymentStatus: orderData.paymentMethod || 'Paid via Razorpay',
+      status: 'Payment Verification Pending',
+      paymentMethod: 'Manual UPI Transfer',
+      paymentStatus: 'Verification Pending', // 'Verification Pending', 'Paid', 'Rejected', 'Screenshot Required'
+      transactionId: orderData.transactionId || '',
+      paymentScreenshot: orderData.paymentScreenshot || '',
+      rejectionReason: '',
+      internalNotes: '',
       courierName: '',
       trackingNumber: '',
       courierWebsite: '',
@@ -481,7 +441,6 @@ export function StoreProvider({ children }) {
       expectedDeliveryDate: '',
       deliveryTimeSlot: '',
       dispatchNotes: '',
-      internalNotes: '',
       isDelayed: false,
       delayDays: 0,
       delayReason: '',
@@ -515,6 +474,138 @@ export function StoreProvider({ children }) {
 
     setCart([]);
     return newOrd;
+  };
+
+  const verifyOrderPayment = (orderId) => {
+    setOrders((prev) =>
+      prev.map((ord) => {
+        if (ord.id === orderId) {
+          const currentStageIndex = 2; // Moves to Printing Started
+          const updatedTimeline = (ord.timeline || TRACKING_STAGES).map((st, idx) => ({
+            ...st,
+            completed: idx <= currentStageIndex,
+            timestamp: idx <= currentStageIndex ? (st.timestamp === 'Pending' ? new Date().toLocaleString() : st.timestamp) : st.timestamp
+          }));
+
+          return {
+            ...ord,
+            paymentStatus: 'Paid',
+            status: 'Payment Verified & Confirmed',
+            currentStageIndex,
+            rejectionReason: '',
+            timeline: updatedTimeline
+          };
+        }
+        return ord;
+      })
+    );
+  };
+
+  const rejectOrderPayment = (orderId, reason) => {
+    setOrders((prev) =>
+      prev.map((ord) => {
+        if (ord.id === orderId) {
+          return {
+            ...ord,
+            paymentStatus: 'Rejected',
+            status: 'Payment Rejected',
+            rejectionReason: reason || 'Invalid UTR Number or unverified bank credit'
+          };
+        }
+        return ord;
+      })
+    );
+  };
+
+  const requestNewPaymentScreenshot = (orderId) => {
+    setOrders((prev) =>
+      prev.map((ord) => {
+        if (ord.id === orderId) {
+          return {
+            ...ord,
+            paymentStatus: 'Screenshot Required',
+            status: 'New Payment Screenshot Required'
+          };
+        }
+        return ord;
+      })
+    );
+  };
+
+  const resubmitOrderPaymentProof = (orderId, { transactionId, paymentScreenshot }) => {
+    setOrders((prev) =>
+      prev.map((ord) => {
+        if (ord.id === orderId) {
+          return {
+            ...ord,
+            transactionId: transactionId || ord.transactionId,
+            paymentScreenshot: paymentScreenshot || ord.paymentScreenshot,
+            paymentStatus: 'Verification Pending',
+            status: 'Payment Verification Pending',
+            rejectionReason: ''
+          };
+        }
+        return ord;
+      })
+    );
+  };
+
+  const addOrderInternalNotes = (orderId, notes) => {
+    setOrders((prev) =>
+      prev.map((ord) => (ord.id === orderId ? { ...ord, internalNotes: notes } : ord))
+    );
+  };
+
+  const updateOrderTrackingDetails = (orderId, updates) => {
+    setOrders((prev) =>
+      prev.map((ord) => {
+        if (ord.id === orderId) {
+          const currentStageIndex = updates.currentStageIndex !== undefined ? updates.currentStageIndex : ord.currentStageIndex;
+          const statusLabel = TRACKING_STAGES[currentStageIndex]?.label || ord.status;
+
+          const updatedTimeline = (updates.timeline || ord.timeline || []).map((st, idx) => ({
+            ...st,
+            completed: idx <= currentStageIndex,
+            timestamp: idx === currentStageIndex ? (st.timestamp === 'Pending' ? new Date().toLocaleString() : st.timestamp) : st.timestamp
+          }));
+
+          return {
+            ...ord,
+            ...updates,
+            currentStageIndex,
+            status: statusLabel,
+            timeline: updatedTimeline
+          };
+        }
+        return ord;
+      })
+    );
+  };
+
+  // ================= FLASH SALE & SETTINGS =================
+  const createFlashSale = (data) => {
+    setFlashSale((prev) => ({
+      ...prev,
+      ...data,
+      enabled: true
+    }));
+  };
+
+  const duplicateFlashSale = () => {
+    const newHistoryItem = {
+      id: `fs-${Date.now()}`,
+      title: flashSale.title,
+      orders: flashSale.ordersCount || 0,
+      revenue: flashSale.totalRevenue || 0,
+      date: new Date().toISOString().split('T')[0]
+    };
+    setFlashSale((prev) => ({
+      ...prev,
+      title: `${prev.title} (Clone)`,
+      ordersCount: 0,
+      totalRevenue: 0,
+      history: [newHistoryItem, ...(prev.history || [])]
+    }));
   };
 
   // ================= CART & WISHLIST ACTIONS =================
@@ -618,7 +709,7 @@ export function StoreProvider({ children }) {
         appliedCoupon,
         setAppliedCoupon,
 
-        // OTP Customer Authentication (Pure OTP Only)
+        // OTP Customer Authentication
         sendOtpApi,
         verifyOtpAndLogin,
         logoutCustomer,
@@ -639,6 +730,13 @@ export function StoreProvider({ children }) {
         updateProduct,
         deleteProduct,
         duplicateProduct,
+
+        // Manual UPI Payment Verification Engine
+        verifyOrderPayment,
+        rejectOrderPayment,
+        requestNewPaymentScreenshot,
+        resubmitOrderPaymentProof,
+        addOrderInternalNotes,
 
         // Flash Sale & Settings
         createFlashSale,

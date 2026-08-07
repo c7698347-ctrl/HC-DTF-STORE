@@ -8,21 +8,21 @@ import {
   Package, 
   Layers,
   ShoppingCart, 
+  CreditCard,
   Users, 
   Flame,
-  Image as ImageIcon,
-  Ticket,
   BarChart3, 
   Settings, 
-  LogOut, 
-  ShieldCheck 
+  LogOut 
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { adminUser, logoutAdmin } = useStore();
+  const { adminUser, logoutAdmin, orders = [] } = useStore();
+
+  const pendingCount = orders.filter(o => o.paymentStatus === 'Verification Pending' || o.paymentStatus === 'Screenshot Required').length;
 
   useEffect(() => {
     const saved = localStorage.getItem('hc_dtf_admin_session');
@@ -36,6 +36,7 @@ export default function AdminLayout({ children }) {
     { label: 'Products', icon: Package, href: '/admin/products' },
     { label: 'Categories Taxonomy', icon: Layers, href: '/admin/categories' },
     { label: 'Orders & Logistics', icon: ShoppingCart, href: '/admin/orders' },
+    { label: `Payment Verifications ${pendingCount > 0 ? `(${pendingCount})` : ''}`, icon: CreditCard, href: '/admin/payments', badge: pendingCount },
     { label: 'Customers', icon: Users, href: '/admin/customers' },
     { label: 'Flash Sale Manager', icon: Flame, href: '/admin/flash-sale' },
     { label: 'Analytics Reports', icon: BarChart3, href: '/admin/reports' },
@@ -69,14 +70,21 @@ export default function AdminLayout({ children }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-3 p-3 rounded-2xl transition ${
+                  className={`flex items-center justify-between p-3 rounded-2xl transition ${
                     isActive 
                       ? 'bg-emerald-600 text-white font-extrabold shadow-lg shadow-emerald-600/30' 
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
                   }`}
                 >
-                  <Icon size={18} />
-                  <span>{item.label}</span>
+                  <div className="flex items-center gap-3">
+                    <Icon size={18} />
+                    <span>{item.label}</span>
+                  </div>
+                  {item.badge > 0 && !isActive && (
+                    <span className="px-2 py-0.5 bg-amber-500 text-slate-950 text-[10px] font-black rounded-full">
+                      {item.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}
