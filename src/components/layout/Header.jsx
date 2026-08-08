@@ -77,29 +77,37 @@ export default function Header() {
       {/* Main Navbar */}
       <nav className="bg-white/95 backdrop-blur-md border-b border-slate-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20 gap-4">
+          <div className="flex items-center justify-between h-20 gap-3">
             
             {/* 1. Left Menu Button */}
             <button
               onClick={() => setIsDrawerMenuOpen(true)}
-              className="p-2 text-slate-900 hover:text-emerald-600 hover:bg-slate-100 rounded-2xl transition flex items-center gap-2 font-extrabold text-xs"
+              className="p-2 text-slate-900 hover:text-emerald-600 hover:bg-slate-100 rounded-2xl transition flex items-center gap-2 font-extrabold text-xs shrink-0"
               aria-label="Open Navigation Menu"
             >
               <Menu size={24} />
               <span className="hidden sm:inline uppercase tracking-wider font-black">☰ Menu</span>
             </button>
 
-            {/* 2. Official HC DTF STORE Uploaded Brand Logo */}
-            <Link href="/" className="flex items-center gap-2 group py-1">
+            {/* 2. Official HC DTF STORE Logo + Beside Text */}
+            <Link href="/" className="flex items-center gap-2 sm:gap-3 group py-1 min-w-0">
               <img
                 src="/images/hc_official_logo.jpg"
                 alt="HC DTF STORE Official Logo"
-                className="h-14 sm:h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-105 rounded-xl shadow-xs"
+                className="h-10 sm:h-14 w-auto object-contain transition-transform duration-300 group-hover:scale-105 rounded-xl shrink-0"
               />
+              <div className="flex flex-col justify-center leading-tight">
+                <span className="font-black text-base sm:text-xl md:text-2xl text-slate-900 tracking-tight whitespace-nowrap">
+                  HC DTF <span className="text-emerald-600">STORE</span>
+                </span>
+                <span className="text-[8px] sm:text-[10px] text-slate-500 font-extrabold uppercase tracking-widest block -mt-0.5 whitespace-nowrap">
+                  PREMIUM DTF PRINTING
+                </span>
+              </div>
             </Link>
 
             {/* 3. Right Action Icons */}
-            <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
               
               {/* 🌐 Language Selector */}
               <div className="relative">
@@ -229,7 +237,7 @@ export default function Header() {
                   />
                   <div>
                     <h3 className="font-extrabold text-sm text-white">HC DTF STORE</h3>
-                    <p className="text-[10px] text-slate-400">Premium DTF Transfers & Machinery</p>
+                    <p className="text-[10px] text-slate-400">PREMIUM DTF PRINTING</p>
                   </div>
                 </div>
                 <button
