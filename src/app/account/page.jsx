@@ -16,7 +16,10 @@ import {
   Edit2,
   CheckCircle2,
   ShieldCheck,
-  Clock
+  Clock,
+  Home,
+  Briefcase,
+  Building
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import OrderCard from '@/components/orders/OrderCard';
@@ -31,8 +34,10 @@ function AccountContent() {
     orders, 
     wishlist, 
     buyLater, 
+    savedAddresses = [],
     addSavedAddress, 
     deleteSavedAddress, 
+    setDefaultAddress,
     updateCustomerProfile,
     setIsAuthOpen
   } = useStore();
@@ -47,6 +52,7 @@ function AccountContent() {
 
   // New Saved Address Form State
   const [showAddressModal, setShowAddressModal] = useState(false);
+  const [addressLabel, setAddressLabel] = useState('Home');
   const [newFullName, setNewFullName] = useState('');
   const [newMobile, setNewMobile] = useState('');
   const [newEmail, setNewEmail] = useState('');
@@ -91,7 +97,9 @@ function AccountContent() {
 
   const handleUpdateProfile = (e) => {
     e.preventDefault();
-    updateCustomerProfile({ name, email, phone });
+    if (updateCustomerProfile) {
+      updateCustomerProfile({ name, email, phone });
+    }
     setProfileMsg('Profile details updated successfully!');
     setTimeout(() => setProfileMsg(''), 3000);
   };
@@ -99,17 +107,19 @@ function AccountContent() {
   const handleAddAddressSubmit = (e) => {
     e.preventDefault();
     addSavedAddress({
-      fullName: newFullName,
-      mobile: newMobile,
-      email: newEmail,
+      label: addressLabel,
+      fullName: newFullName || customerUser.name,
+      mobile: newMobile || customerUser.phone,
+      email: newEmail || customerUser.email,
       houseFlatNo: newHouseFlatNo,
       street: newStreet,
       area: newArea,
       landmark: newLandmark,
       city: newCity,
-      district: newDistrict,
+      district: newDistrict || newCity,
       state: newState,
-      pincode: newPincode
+      pincode: newPincode,
+      isDefault: savedAddresses.length === 0
     });
     setShowAddressModal(false);
     // Reset form
@@ -133,13 +143,12 @@ function AccountContent() {
     doc.setFontSize(10);
     doc.text(`Invoice Number: INV-${ord.id}`, 14, 30);
     doc.text(`Date: ${new Date(ord.createdAt).toLocaleDateString()}`, 14, 36);
-    doc.text(`GSTIN: 36ABCDE1234F1Z5`, 14, 42);
 
-    doc.text(`Customer Name: ${ord.customerName}`, 14, 52);
-    doc.text(`Email / Phone: ${ord.customerEmail} | ${ord.customerPhone}`, 14, 58);
-    doc.text(`Address: ${ord.address}`, 14, 64);
+    doc.text(`Customer Name: ${ord.customerName}`, 14, 46);
+    doc.text(`Email / Phone: ${ord.email} | ${ord.phone}`, 14, 52);
+    doc.text(`Address: ${ord.shippingAddress?.houseFlatNo || ''}, ${ord.shippingAddress?.city || ''}, ${ord.shippingAddress?.state || ''}`, 14, 58);
 
-    let y = 78;
+    let y = 72;
     doc.text('Order Line Items:', 14, y);
     y += 8;
 
@@ -151,9 +160,7 @@ function AccountContent() {
     y += 6;
     doc.text(`Subtotal: Rs.${ord.subtotal}`, 14, y);
     y += 6;
-    doc.text(`GST (18%): Rs.${ord.gst}`, 14, y);
-    y += 6;
-    doc.text(`Shipping Fee: Rs.${ord.shipping}`, 14, y);
+    doc.text(`Shipping Fee: Rs.${ord.shippingFee}`, 14, y);
     y += 8;
     doc.setFontSize(12);
     doc.text(`Grand Total Paid: Rs.${ord.total}`, 14, y);
@@ -198,7 +205,7 @@ function AccountContent() {
         {/* Tabbed Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           
-          {/* Left Tab Buttons (NO PASSWORD ANYWHERE) */}
+          {/* Left Tab Buttons */}
           <div className="lg:col-span-1 bg-white p-4 rounded-3xl border border-slate-200 shadow-sm space-y-1 h-fit">
             
             <button
@@ -220,7 +227,7 @@ function AccountContent() {
               }`}
             >
               <span className="flex items-center gap-2">
-                <MapPin size={16} /> Saved Addresses ({customerUser.addresses?.length || 0})
+                <MapPin size={16} /> Saved Addresses ({savedAddresses.length})
               </span>
               <ChevronRight size={14} />
             </button>
@@ -256,7 +263,7 @@ function AccountContent() {
               }`}
             >
               <span className="flex items-center gap-2">
-                <FileText size={16} /> GST Tax Invoices
+                <FileText size={16} /> Tax Invoices
               </span>
               <ChevronRight size={14} />
             </button>
@@ -298,13 +305,13 @@ function AccountContent() {
               </div>
             )}
 
-            {/* Saved Addresses Tab */}
+            {/* Saved Addresses Tab (Amazon Style) */}
             {activeTab === 'addresses' && (
               <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                   <div>
-                    <h3 className="text-xl font-black text-slate-900">Saved Delivery Addresses</h3>
-                    <p className="text-xs text-slate-500">Manage multiple addresses for fast express checkout</p>
+                    <h3 className="text-xl font-black text-slate-900">Amazon-Style Saved Addresses</h3>
+                    <p className="text-xs text-slate-500">Addresses are saved to your profile and automatically loaded during checkout</p>
                   </div>
                   <button
                     onClick={() => setShowAddressModal(true)}
@@ -314,7 +321,7 @@ function AccountContent() {
                   </button>
                 </div>
 
-                {(!customerUser.addresses || customerUser.addresses.length === 0) ? (
+                {savedAddresses.length === 0 ? (
                   <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
                     <MapPin size={32} className="mx-auto text-slate-400" />
                     <p className="text-xs font-bold text-slate-700">No saved addresses found.</p>
@@ -322,29 +329,43 @@ function AccountContent() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {customerUser.addresses.map((addr) => (
-                      <div key={addr.id} className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 relative">
+                    {savedAddresses.map((addr) => (
+                      <div key={addr.id} className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5 relative">
                         <div className="flex items-center justify-between">
-                          <span className="font-bold text-slate-900 text-sm">{addr.fullName}</span>
-                          {addr.isDefault && (
-                            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
-                              Default
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 text-sm">{addr.fullName}</span>
+                            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase border border-emerald-300">
+                              {addr.label || 'Home'}
                             </span>
+                          </div>
+
+                          {addr.isDefault ? (
+                            <span className="bg-slate-900 text-white text-[10px] font-black px-2.5 py-0.5 rounded-md uppercase">
+                              Default Address
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setDefaultAddress(addr.id)}
+                              className="text-[11px] font-bold text-emerald-600 hover:underline"
+                            >
+                              Set as Default
+                            </button>
                           )}
                         </div>
-                        <p className="text-xs text-slate-600 leading-relaxed">
+
+                        <p className="text-xs text-slate-600 leading-relaxed font-medium">
                           {addr.houseFlatNo}, {addr.street}, {addr.area}
                           {addr.landmark ? ` (Landmark: ${addr.landmark})` : ''}<br />
-                          {addr.city}, {addr.district}, {addr.state} - <strong>{addr.pincode}</strong>
+                          {addr.city}, {addr.district}, {addr.state} - <strong className="text-slate-900 font-bold">{addr.pincode}</strong>
                         </p>
-                        <p className="text-xs text-slate-500">Phone: {addr.mobile} • {addr.email}</p>
+                        <p className="text-xs text-slate-500 font-semibold">Mobile: {addr.mobile} {addr.email ? `• ${addr.email}` : ''}</p>
                         
-                        <div className="pt-2 flex justify-end">
+                        <div className="pt-2 flex justify-end border-t border-slate-200/60">
                           <button
                             onClick={() => deleteSavedAddress(addr.id)}
                             className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-bold flex items-center gap-1 transition"
                           >
-                            <Trash2 size={14} /> Remove
+                            <Trash2 size={14} /> Remove Address
                           </button>
                         </div>
                       </div>
@@ -399,7 +420,7 @@ function AccountContent() {
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full bg-slate-50 border rounded-xl p-3 focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-slate-50 border rounded-xl p-3 focus:outline-none focus:border-emerald-500 font-bold text-slate-900"
                     />
                   </div>
 
@@ -410,7 +431,7 @@ function AccountContent() {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="e.g. 9876543210"
-                      className="w-full bg-slate-50 border rounded-xl p-3 focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-slate-50 border rounded-xl p-3 focus:outline-none focus:border-emerald-500 font-bold text-slate-900"
                     />
                   </div>
 
@@ -421,7 +442,7 @@ function AccountContent() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="e.g. customer@domain.com"
-                      className="w-full bg-slate-50 border rounded-xl p-3 focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-slate-50 border rounded-xl p-3 focus:outline-none focus:border-emerald-500 font-bold text-slate-900"
                     />
                   </div>
 
@@ -449,7 +470,7 @@ function AccountContent() {
                       <div key={ord.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between text-xs">
                         <div>
                           <p className="font-bold text-slate-900">Invoice #INV-{ord.id}</p>
-                          <p className="text-slate-500">Total: ₹{ord.total} (Includes 18% GST)</p>
+                          <p className="text-slate-500">Total Paid: ₹{ord.total}</p>
                         </div>
                         <button
                           onClick={() => downloadGstInvoicePdf(ord)}
@@ -477,18 +498,34 @@ function AccountContent() {
           <div className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl z-10 space-y-4">
             <h3 className="text-lg font-black text-slate-900">Add New Delivery Address</h3>
 
+            <div className="flex items-center gap-2 pb-1">
+              <span className="text-xs font-bold text-slate-700">Label:</span>
+              {['Home', 'Work', 'Other'].map((lbl) => (
+                <button
+                  key={lbl}
+                  type="button"
+                  onClick={() => setAddressLabel(lbl)}
+                  className={`px-3 py-1 rounded-xl text-xs font-extrabold transition ${
+                    addressLabel === lbl ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
+
             <form onSubmit={handleAddAddressSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <input type="text" required placeholder="Full Name *" value={newFullName} onChange={(e) => setNewFullName(e.target.value)} className="bg-slate-50 border p-3 rounded-xl" />
-              <input type="tel" required placeholder="Mobile Number *" value={newMobile} onChange={(e) => setNewMobile(e.target.value)} className="bg-slate-50 border p-3 rounded-xl" />
-              <input type="email" required placeholder="Email Address *" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="sm:col-span-2 bg-slate-50 border p-3 rounded-xl" />
-              <input type="text" required placeholder="House / Flat No *" value={newHouseFlatNo} onChange={(e) => setNewHouseFlatNo(e.target.value)} className="bg-slate-50 border p-3 rounded-xl" />
-              <input type="text" required placeholder="Street *" value={newStreet} onChange={(e) => setNewStreet(e.target.value)} className="bg-slate-50 border p-3 rounded-xl" />
-              <input type="text" required placeholder="Area *" value={newArea} onChange={(e) => setNewArea(e.target.value)} className="bg-slate-50 border p-3 rounded-xl" />
-              <input type="text" placeholder="Landmark (Optional)" value={newLandmark} onChange={(e) => setNewLandmark(e.target.value)} className="bg-slate-50 border p-3 rounded-xl" />
-              <input type="text" required placeholder="City *" value={newCity} onChange={(e) => setNewCity(e.target.value)} className="bg-slate-50 border p-3 rounded-xl" />
-              <input type="text" required placeholder="District *" value={newDistrict} onChange={(e) => setNewDistrict(e.target.value)} className="bg-slate-50 border p-3 rounded-xl" />
-              <input type="text" required placeholder="State *" value={newState} onChange={(e) => setNewState(e.target.value)} className="bg-slate-50 border p-3 rounded-xl" />
-              <input type="text" required placeholder="Pincode *" value={newPincode} onChange={(e) => setNewPincode(e.target.value)} className="bg-slate-50 border p-3 rounded-xl" />
+              <input type="text" required placeholder="Full Name *" value={newFullName} onChange={(e) => setNewFullName(e.target.value)} className="bg-slate-50 border p-3 rounded-xl font-medium" />
+              <input type="tel" required placeholder="Mobile Number *" value={newMobile} onChange={(e) => setNewMobile(e.target.value)} className="bg-slate-50 border p-3 rounded-xl font-medium" />
+              <input type="email" required placeholder="Email Address *" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="sm:col-span-2 bg-slate-50 border p-3 rounded-xl font-medium" />
+              <input type="text" required placeholder="House / Flat No *" value={newHouseFlatNo} onChange={(e) => setNewHouseFlatNo(e.target.value)} className="bg-slate-50 border p-3 rounded-xl font-medium" />
+              <input type="text" required placeholder="Street *" value={newStreet} onChange={(e) => setNewStreet(e.target.value)} className="bg-slate-50 border p-3 rounded-xl font-medium" />
+              <input type="text" required placeholder="Area *" value={newArea} onChange={(e) => setNewArea(e.target.value)} className="bg-slate-50 border p-3 rounded-xl font-medium" />
+              <input type="text" placeholder="Landmark (Optional)" value={newLandmark} onChange={(e) => setNewLandmark(e.target.value)} className="bg-slate-50 border p-3 rounded-xl font-medium" />
+              <input type="text" required placeholder="City *" value={newCity} onChange={(e) => setNewCity(e.target.value)} className="bg-slate-50 border p-3 rounded-xl font-medium" />
+              <input type="text" required placeholder="District *" value={newDistrict} onChange={(e) => setNewDistrict(e.target.value)} className="bg-slate-50 border p-3 rounded-xl font-medium" />
+              <input type="text" required placeholder="State *" value={newState} onChange={(e) => setNewState(e.target.value)} className="bg-slate-50 border p-3 rounded-xl font-bold text-slate-900" />
+              <input type="text" required placeholder="Pincode *" value={newPincode} onChange={(e) => setNewPincode(e.target.value)} className="bg-slate-50 border p-3 rounded-xl font-medium" />
 
               <div className="sm:col-span-2 pt-2 flex justify-end gap-2">
                 <button type="button" onClick={() => setShowAddressModal(false)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold">

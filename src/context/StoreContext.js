@@ -38,20 +38,23 @@ export function StoreProvider({ children }) {
   const [machineConfig, setMachineConfigState] = useState(INITIAL_MACHINE_CONFIG);
   const [machines, setMachinesState] = useState(INITIAL_MACHINES_LIST);
 
-  // 4. Customer User Session (OTP Verified Only)
+  // 4. Saved Addresses State (Multiple Addresses like Amazon)
+  const [savedAddresses, setSavedAddresses] = useState([]);
+
+  // 5. Customer User Session (OTP Verified Only)
   const [customerUser, setCustomerUser] = useState(null);
 
-  // 5. Admin Session State
+  // 6. Admin Session State
   const [adminUser, setAdminUser] = useState(null);
 
-  // 6. Customer Cart, Wishlist, Buy Later, Recently Viewed
+  // 7. Customer Cart, Wishlist, Buy Later, Recently Viewed
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState([]);
   const [buyLater, setBuyLater] = useState([]);
   const [recentlyViewed, setRecentlyViewed] = useState([]);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
 
-  // 7. UI Active Modals & Quick View
+  // 8. UI Active Modals & Quick View
   const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -106,6 +109,9 @@ export function StoreProvider({ children }) {
       const savedCustomersList = localStorage.getItem('hc_dtf_customers_list');
       if (savedCustomersList) setCustomers(JSON.parse(savedCustomersList));
 
+      const savedAddressesList = localStorage.getItem('hc_dtf_saved_addresses');
+      if (savedAddressesList) setSavedAddresses(JSON.parse(savedAddressesList));
+
       const savedCart = localStorage.getItem('hc_dtf_cart');
       if (savedCart) setCart(JSON.parse(savedCart));
 
@@ -152,6 +158,10 @@ export function StoreProvider({ children }) {
   }, [customers]);
 
   useEffect(() => {
+    localStorage.setItem('hc_dtf_saved_addresses', JSON.stringify(savedAddresses));
+  }, [savedAddresses]);
+
+  useEffect(() => {
     localStorage.setItem('hc_dtf_cart', JSON.stringify(cart));
   }, [cart]);
 
@@ -177,6 +187,70 @@ export function StoreProvider({ children }) {
 
   // Helper i18n Translation getter
   const t = (key) => getTranslation(currentLanguage, key);
+
+  // ================= SAVED ADDRESS ACTIONS (AMAZON STYLE) =================
+  const addSavedAddress = (addr) => {
+    const isFirst = savedAddresses.length === 0;
+    const shouldBeDefault = addr.isDefault || isFirst;
+
+    const newAddr = {
+      id: `addr_${Date.now()}`,
+      label: addr.label || 'Home',
+      isDefault: shouldBeDefault,
+      fullName: addr.fullName,
+      mobile: addr.mobile,
+      email: addr.email,
+      houseFlatNo: addr.houseFlatNo,
+      street: addr.street,
+      area: addr.area,
+      landmark: addr.landmark || '',
+      city: addr.city,
+      district: addr.district || addr.city,
+      state: addr.state,
+      pincode: addr.pincode,
+      lat: addr.lat || null,
+      lng: addr.lng || null
+    };
+
+    setSavedAddresses((prev) => {
+      const updated = shouldBeDefault 
+        ? prev.map((a) => ({ ...a, isDefault: false }))
+        : prev;
+      return [newAddr, ...updated];
+    });
+
+    return newAddr;
+  };
+
+  const updateSavedAddress = (id, fields) => {
+    setSavedAddresses((prev) =>
+      prev.map((a) => {
+        if (a.id === id) {
+          return { ...a, ...fields };
+        }
+        if (fields.isDefault) {
+          return { ...a, isDefault: false };
+        }
+        return a;
+      })
+    );
+  };
+
+  const deleteSavedAddress = (id) => {
+    setSavedAddresses((prev) => {
+      const filtered = prev.filter((a) => a.id !== id);
+      if (filtered.length > 0 && !filtered.some((a) => a.isDefault)) {
+        filtered[0].isDefault = true;
+      }
+      return filtered;
+    });
+  };
+
+  const setDefaultAddress = (id) => {
+    setSavedAddresses((prev) =>
+      prev.map((a) => ({ ...a, isDefault: a.id === id }))
+    );
+  };
 
   // ================= SHIPPING RULES ACTIONS =================
   const addShippingRule = (ruleData) => {
@@ -447,6 +521,13 @@ export function StoreProvider({ children }) {
         customers,
         orders,
         shippingRules,
+        savedAddresses,
+
+        // Saved Address Actions (Amazon Style)
+        addSavedAddress,
+        updateSavedAddress,
+        deleteSavedAddress,
+        setDefaultAddress,
 
         // Shipping Rules CRUD
         addShippingRule,

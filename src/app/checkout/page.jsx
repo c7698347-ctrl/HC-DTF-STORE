@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { 
   ShieldCheck, 
   ShoppingBag, 
-  ArrowRight, 
   Check, 
   Truck, 
   MapPin,
@@ -19,7 +18,14 @@ import {
   User,
   Phone,
   Mail,
-  AlertTriangle
+  AlertTriangle,
+  Plus,
+  Edit,
+  Home,
+  Briefcase,
+  Building,
+  CheckCircle2,
+  ChevronRight
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import { jsPDF } from 'jspdf';
@@ -49,7 +55,10 @@ export default function CheckoutPage() {
     addOrder,
     getShippingFeeForState,
     products = [],
-    updateProduct
+    updateProduct,
+    savedAddresses = [],
+    addSavedAddress,
+    setDefaultAddress
   } = useStore();
 
   // Login / OTP Form State if guest
@@ -58,7 +67,13 @@ export default function CheckoutPage() {
   const [otpStep, setOtpStep] = useState(1);
   const [loginError, setLoginError] = useState('');
 
-  // Shipping Address Form State
+  // Selected Address State
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [isChangingAddress, setIsChangingAddress] = useState(false);
+  const [isAddingNewAddress, setIsAddingNewAddress] = useState(false);
+
+  // New Address Form State
+  const [addressLabel, setAddressLabel] = useState('Home');
   const [fullName, setFullName] = useState(customerUser?.name || '');
   const [mobile, setMobile] = useState(customerUser?.phone || '');
   const [email, setEmail] = useState(customerUser?.email || '');
@@ -70,6 +85,9 @@ export default function CheckoutPage() {
   const [district, setDistrict] = useState('Hyderabad');
   const [state, setState] = useState('Telangana');
   const [pincode, setPincode] = useState('500081');
+  const [lat, setLat] = useState(null);
+  const [lng, setLng] = useState(null);
+
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsMsg, setGpsMsg] = useState('');
 
@@ -81,6 +99,19 @@ export default function CheckoutPage() {
   const [paymentError, setPaymentError] = useState('');
   const [completedOrder, setCompletedOrder] = useState(null);
 
+  // Auto-Select Default Address
+  useEffect(() => {
+    if (savedAddresses.length > 0) {
+      const defaultAddr = savedAddresses.find((a) => a.isDefault) || savedAddresses[0];
+      if (defaultAddr) {
+        setSelectedAddressId(defaultAddr.id);
+        populateFields(defaultAddr);
+      }
+    } else {
+      setIsAddingNewAddress(true);
+    }
+  }, [savedAddresses]);
+
   useEffect(() => {
     if (customerUser) {
       if (customerUser.name && !fullName) setFullName(customerUser.name);
@@ -89,7 +120,23 @@ export default function CheckoutPage() {
     }
   }, [customerUser]);
 
-  // GPS Location Auto Suggestion
+  const populateFields = (addr) => {
+    setFullName(addr.fullName || customerUser?.name || '');
+    setMobile(addr.mobile || customerUser?.phone || '');
+    setEmail(addr.email || customerUser?.email || '');
+    setHouseFlatNo(addr.houseFlatNo || '');
+    setStreet(addr.street || '');
+    setArea(addr.area || '');
+    setLandmark(addr.landmark || '');
+    setCity(addr.city || 'Hyderabad');
+    setDistrict(addr.district || addr.city || 'Hyderabad');
+    setState(addr.state || 'Telangana');
+    setPincode(addr.pincode || '500081');
+    setLat(addr.lat || null);
+    setLng(addr.lng || null);
+  };
+
+  // Single Location Request during Sign-up / First Address Setup
   const handleDetectGPSLocation = () => {
     if (!navigator.geolocation) {
       alert('Geolocation is not supported by your browser.');
@@ -100,21 +147,82 @@ export default function CheckoutPage() {
     setGpsMsg('Detecting location via GPS...');
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        setLat(latitude);
+        setLng(longitude);
+
+        try {
+          // OpenStreetMap Reverse Geocoding API
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const data = await res.json();
+
+          if (data && data.address) {
+            const add = data.address;
+            setCity(add.city || add.town || add.village || add.suburb || 'Hyderabad');
+            setDistrict(add.state_district || add.county || add.city || 'Hyderabad');
+            setState(add.state || 'Telangana');
+            setPincode(add.postcode || '500081');
+            setArea(add.suburb || add.neighbourhood || add.residential || '');
+            setStreet(add.road || add.pedestrian || '');
+            setGpsMsg('Location detected & address auto-filled! Please verify before saving.');
+          } else {
+            setGpsMsg('GPS Coordinates captured. Please verify City, State & Pincode.');
+          }
+        } catch (e) {
+          setGpsMsg('GPS Location captured. Defaulted to Telangana region.');
+          setCity('Hyderabad');
+          setDistrict('Hyderabad');
+          setState('Telangana');
+          setPincode('500081');
+        }
+
         setGpsLoading(false);
-        setGpsMsg('GPS Coordinates fetched! Defaulted to Telangana / Hyderabad region.');
-        setCity('Hyderabad');
-        setDistrict('Hyderabad');
-        setState('Telangana');
-        setPincode('500081');
-        setTimeout(() => setGpsMsg(''), 4000);
+        setTimeout(() => setGpsMsg(''), 5000);
       },
       (error) => {
         setGpsLoading(false);
-        setGpsMsg('Could not fetch exact GPS location. Please select state manually.');
+        setGpsMsg('Location permission denied or unavailable. Please select State manually.');
         setTimeout(() => setGpsMsg(''), 4000);
       }
     );
+  };
+
+  const handleSaveNewAddressSubmit = (e) => {
+    e.preventDefault();
+    if (!fullName || !mobile || !email || !houseFlatNo || !street || !area || !city || !state || !pincode) {
+      alert('Please fill out all required address fields.');
+      return;
+    }
+
+    const created = addSavedAddress({
+      label: addressLabel,
+      fullName,
+      mobile,
+      email,
+      houseFlatNo,
+      street,
+      area,
+      landmark,
+      city,
+      district,
+      state,
+      pincode,
+      lat,
+      lng,
+      isDefault: savedAddresses.length === 0
+    });
+
+    setSelectedAddressId(created.id);
+    setIsAddingNewAddress(false);
+    setIsChangingAddress(false);
+  };
+
+  const handleSelectAddress = (addr) => {
+    setSelectedAddressId(addr.id);
+    populateFields(addr);
+    setIsChangingAddress(false);
   };
 
   // Guest OTP Login Handler
@@ -135,8 +243,12 @@ export default function CheckoutPage() {
     }
   };
 
+  // Selected Active Address
+  const activeAddress = savedAddresses.find((a) => a.id === selectedAddressId) || savedAddresses[0];
+
   // Dynamic Admin Shipping Fee Lookup (NO HARDCODED FALLBACKS)
-  const shippingFee = getShippingFeeForState(state);
+  const currentStateName = activeAddress ? activeAddress.state : state;
+  const shippingFee = getShippingFeeForState(currentStateName);
   const isShippingUnavailable = shippingFee === null || shippingFee === undefined;
 
   const subtotal = cart.reduce((acc, item) => acc + (item.offerPrice || item.price) * item.quantity, 0);
@@ -195,8 +307,22 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!fullName || !mobile || !email || !houseFlatNo || !street || !area || !city || !district || !state || !pincode) {
-      alert('Please complete all required shipping address fields.');
+    const currentShippingAddr = activeAddress || {
+      fullName,
+      mobile,
+      email,
+      houseFlatNo,
+      street,
+      area,
+      landmark,
+      city,
+      district,
+      state,
+      pincode
+    };
+
+    if (!currentShippingAddr.fullName || !currentShippingAddr.mobile || !currentShippingAddr.houseFlatNo || !currentShippingAddr.state || !currentShippingAddr.pincode) {
+      alert('Please select or provide a complete shipping address.');
       return;
     }
 
@@ -218,10 +344,10 @@ export default function CheckoutPage() {
           currency: 'INR',
           receipt: `rcpt_${Date.now()}`,
           notes: {
-            customerName: fullName,
-            phone: mobile,
-            email: email,
-            state: state,
+            customerName: currentShippingAddr.fullName,
+            phone: currentShippingAddr.mobile,
+            email: currentShippingAddr.email,
+            state: currentShippingAddr.state,
             shippingFee: shippingFee
           }
         })
@@ -244,12 +370,12 @@ export default function CheckoutPage() {
         image: '/icon-192.png',
         order_id: orderData.id,
         prefill: {
-          name: fullName,
-          email: email,
-          contact: mobile
+          name: currentShippingAddr.fullName,
+          email: currentShippingAddr.email,
+          contact: currentShippingAddr.mobile
         },
         notes: {
-          address: `${houseFlatNo}, ${street}, ${area}, ${city}, ${state} - ${pincode}`
+          address: `${currentShippingAddr.houseFlatNo}, ${currentShippingAddr.street}, ${currentShippingAddr.area}, ${currentShippingAddr.city}, ${currentShippingAddr.state} - ${currentShippingAddr.pincode}`
         },
         theme: {
           color: '#059669'
@@ -277,21 +403,22 @@ export default function CheckoutPage() {
               }
             });
 
+            // Copy Shipping Address permanently to order snapshot
             const newOrderObj = {
               id: `HC-ORD-${Math.floor(100000 + Math.random() * 900000)}`,
               createdAt: new Date().toISOString(),
-              customerName: fullName,
-              phone: mobile,
-              email: email,
+              customerName: currentShippingAddr.fullName,
+              phone: currentShippingAddr.mobile,
+              email: currentShippingAddr.email,
               shippingAddress: {
-                houseFlatNo,
-                street,
-                area,
-                landmark,
-                city,
-                district,
-                state,
-                pincode
+                houseFlatNo: currentShippingAddr.houseFlatNo,
+                street: currentShippingAddr.street,
+                area: currentShippingAddr.area,
+                landmark: currentShippingAddr.landmark,
+                city: currentShippingAddr.city,
+                district: currentShippingAddr.district || currentShippingAddr.city,
+                state: currentShippingAddr.state,
+                pincode: currentShippingAddr.pincode
               },
               items: cart,
               subtotal,
@@ -522,156 +649,319 @@ export default function CheckoutPage() {
           {/* Left Column: Shipping Address & Policy Agreement */}
           <div className="lg:col-span-7 space-y-6">
             
-            {/* Shipping Address Inputs */}
+            {/* AMAZON-STYLE SAVED ADDRESS & CHECKOUT CARD */}
             <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-sm font-black text-slate-900">
-                  1. Customer Shipping Address
-                </h3>
+                <div className="flex items-center gap-2">
+                  <MapPin size={20} className="text-emerald-600" />
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                    Delivering to
+                  </h3>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={handleDetectGPSLocation}
-                  disabled={gpsLoading}
-                  className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition"
-                >
-                  <Navigation size={14} className={gpsLoading ? 'animate-spin' : ''} />
-                  <span>{gpsLoading ? 'Detecting GPS...' : 'Detect Current Location'}</span>
-                </button>
+                {savedAddresses.length > 0 && !isAddingNewAddress && !isChangingAddress && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsChangingAddress(true)}
+                      className="text-xs font-extrabold text-emerald-600 hover:text-emerald-700 underline"
+                    >
+                      Change Address
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingNewAddress(true);
+                        setIsChangingAddress(false);
+                      }}
+                      className="text-xs font-extrabold text-slate-700 hover:text-slate-900 flex items-center gap-1"
+                    >
+                      <Plus size={14} /> Add New Address
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {gpsMsg && (
-                <div className="p-2.5 bg-emerald-50 text-emerald-800 text-[11px] font-bold rounded-xl border border-emerald-200">
-                  {gpsMsg}
+              {/* A. SAVED DEFAULT ADDRESS CARD (NO REPEATED LOCATION REQUESTS) */}
+              {activeAddress && !isChangingAddress && !isAddingNewAddress && (
+                <div className="p-5 bg-slate-50 border-2 border-emerald-500/40 rounded-2xl space-y-2 relative transition">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-slate-900 text-sm">{activeAddress.fullName}</span>
+                      <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-full uppercase border border-emerald-300">
+                        {activeAddress.label || 'Home'}
+                      </span>
+                      {activeAddress.isDefault && (
+                        <span className="px-2 py-0.5 bg-slate-900 text-white text-[9px] font-bold rounded-md uppercase">
+                          Default
+                        </span>
+                      )}
+                    </div>
+                    <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
+                  </div>
+
+                  <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                    {activeAddress.houseFlatNo}, {activeAddress.street}, {activeAddress.area}
+                    {activeAddress.landmark ? `, Near ${activeAddress.landmark}` : ''}, {activeAddress.city}, {activeAddress.state} - <strong className="text-slate-900 font-bold">{activeAddress.pincode}</strong>
+                  </p>
+
+                  <div className="flex items-center gap-4 text-xs font-semibold text-slate-600 pt-1">
+                    <span>Mobile: <strong>{activeAddress.mobile}</strong></span>
+                    {activeAddress.email && <span>Email: {activeAddress.email}</span>}
+                  </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Full Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Enter your full name"
-                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
+              {/* B. ADDRESS SELECTOR DRAWER / LIST IF CUSTOMER CLICKS CHANGE ADDRESS */}
+              {isChangingAddress && (
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-xs font-bold text-slate-700 uppercase">Select Saved Delivery Address:</h4>
+                  
+                  {savedAddresses.map((addr) => (
+                    <div
+                      key={addr.id}
+                      onClick={() => handleSelectAddress(addr)}
+                      className={`p-4 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
+                        selectedAddressId === addr.id
+                          ? 'border-emerald-600 bg-emerald-50/50'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="space-y-1 text-xs">
+                        <div className="flex items-center gap-2">
+                          <strong className="text-slate-900 font-bold">{addr.fullName}</strong>
+                          <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md">
+                            {addr.label}
+                          </span>
+                        </div>
+                        <p className="text-slate-600">
+                          {addr.houseFlatNo}, {addr.street}, {addr.city}, {addr.state} - {addr.pincode}
+                        </p>
+                      </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Mobile Number *</label>
-                  <input
-                    type="tel"
-                    required
-                    value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
-                    placeholder="10-digit mobile number"
-                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
+                      {selectedAddressId === addr.id && (
+                        <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                      )}
+                    </div>
+                  ))}
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Email Address *</label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter email address"
-                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">House / Flat / Door No *</label>
-                  <input
-                    type="text"
-                    required
-                    value={houseFlatNo}
-                    onChange={(e) => setHouseFlatNo(e.target.value)}
-                    placeholder="Flat No, Building, House"
-                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
-                  />
+                  <div className="flex items-center justify-between pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsChangingAddress(false)}
+                      className="text-xs font-bold text-slate-600 hover:text-slate-900"
+                    >
+                      Cancel & Keep Active Address
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingNewAddress(true);
+                        setIsChangingAddress(false);
+                      }}
+                      className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center gap-1"
+                    >
+                      <Plus size={14} /> Add Another Address
+                    </button>
+                  </div>
                 </div>
+              )}
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Street / Road *</label>
-                  <input
-                    type="text"
-                    required
-                    value={street}
-                    onChange={(e) => setStreet(e.target.value)}
-                    placeholder="Street name"
-                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
+              {/* C. NEW ADDRESS FORM (SHOWN FOR FIRST TIME OR WHEN ADDING NEW ADDRESS) */}
+              {(isAddingNewAddress || savedAddresses.length === 0) && (
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center justify-between bg-emerald-50/70 p-3 rounded-2xl border border-emerald-200">
+                    <span className="text-xs font-bold text-emerald-900">
+                      {savedAddresses.length === 0 ? 'First-Time Location & Delivery Setup' : 'Add New Shipping Address'}
+                    </span>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Area / Colony *</label>
-                  <input
-                    type="text"
-                    required
-                    value={area}
-                    onChange={(e) => setArea(e.target.value)}
-                    placeholder="Colony or Area"
-                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
+                    {/* GPS LOCATION BUTTON SHOWN ONCE FOR NEW ADDRESS SETUP */}
+                    <button
+                      type="button"
+                      onClick={handleDetectGPSLocation}
+                      disabled={gpsLoading}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition"
+                    >
+                      <Navigation size={14} className={gpsLoading ? 'animate-spin' : ''} />
+                      <span>{gpsLoading ? 'Detecting Location...' : 'Use Current Location'}</span>
+                    </button>
+                  </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Landmark (Optional)</label>
-                  <input
-                    type="text"
-                    value={landmark}
-                    onChange={(e) => setLandmark(e.target.value)}
-                    placeholder="Near landmark"
-                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
+                  {gpsMsg && (
+                    <div className="p-3 bg-emerald-950 text-emerald-300 text-xs font-bold rounded-xl border border-emerald-800">
+                      {gpsMsg}
+                    </div>
+                  )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">City *</label>
-                  <input
-                    type="text"
-                    required
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
+                  <div className="flex items-center gap-3 pb-1">
+                    <span className="text-xs font-bold text-slate-700">Save Address As:</span>
+                    {['Home', 'Work', 'Other'].map((lbl) => (
+                      <button
+                        key={lbl}
+                        type="button"
+                        onClick={() => setAddressLabel(lbl)}
+                        className={`px-3 py-1 rounded-xl text-xs font-extrabold transition ${
+                          addressLabel === lbl
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">State *</label>
-                  <input
-                    type="text"
-                    required
-                    value={state}
-                    onChange={(e) => setState(e.target.value)}
-                    placeholder="Enter state"
-                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold text-slate-900 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Full Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Enter your full name"
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Pincode *</label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    value={pincode}
-                    onChange={(e) => setPincode(e.target.value)}
-                    placeholder="6-digit pincode"
-                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
-                  />
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Mobile Number *</label>
+                      <input
+                        type="tel"
+                        required
+                        value={mobile}
+                        onChange={(e) => setMobile(e.target.value)}
+                        placeholder="10-digit mobile number"
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Email Address *</label>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter email address"
+                      className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">House / Flat / Door No *</label>
+                      <input
+                        type="text"
+                        required
+                        value={houseFlatNo}
+                        onChange={(e) => setHouseFlatNo(e.target.value)}
+                        placeholder="Flat No, Building, House"
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Street / Road *</label>
+                      <input
+                        type="text"
+                        required
+                        value={street}
+                        onChange={(e) => setStreet(e.target.value)}
+                        placeholder="Street name"
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Area / Colony *</label>
+                      <input
+                        type="text"
+                        required
+                        value={area}
+                        onChange={(e) => setArea(e.target.value)}
+                        placeholder="Colony or Area"
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Landmark (Optional)</label>
+                      <input
+                        type="text"
+                        value={landmark}
+                        onChange={(e) => setLandmark(e.target.value)}
+                        placeholder="Near landmark"
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">City *</label>
+                      <input
+                        type="text"
+                        required
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">State *</label>
+                      <input
+                        type="text"
+                        required
+                        value={state}
+                        onChange={(e) => setState(e.target.value)}
+                        placeholder="Enter state"
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold text-slate-900 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Pincode *</label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={6}
+                        value={pincode}
+                        onChange={(e) => setPincode(e.target.value)}
+                        placeholder="6-digit pincode"
+                        className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-medium text-slate-900 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    {savedAddresses.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingNewAddress(false)}
+                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
+                      >
+                        Cancel
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleSaveNewAddressSubmit}
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold shadow-md transition"
+                    >
+                      Save Address & Use for Delivery
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
             </div>
 
@@ -708,7 +998,7 @@ export default function CheckoutPage() {
                   <span>Opening Razorpay Secure Checkout Popup...</span>
                 </>
               ) : isShippingUnavailable ? (
-                <span>Shipping Unavailable for {state}</span>
+                <span>Shipping Unavailable for {currentStateName}</span>
               ) : (
                 <>
                   <CreditCard size={20} />
@@ -747,7 +1037,7 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="flex justify-between font-bold">
-                  <span>State Delivery Charge ({state})</span>
+                  <span>State Delivery Charge ({currentStateName})</span>
                   {isShippingUnavailable ? (
                     <span className="text-rose-600 font-extrabold">Unavailable</span>
                   ) : (
