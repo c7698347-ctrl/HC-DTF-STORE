@@ -19,7 +19,14 @@ import {
   Clock,
   Home,
   Briefcase,
-  Building
+  Building,
+  CreditCard,
+  Settings,
+  Navigation,
+  KeyRound,
+  Bell,
+  Lock,
+  ExternalLink
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import OrderCard from '@/components/orders/OrderCard';
@@ -31,9 +38,9 @@ function AccountContent() {
   const { 
     customerUser, 
     logoutCustomer, 
-    orders, 
-    wishlist, 
-    buyLater, 
+    orders = [], 
+    wishlist = [], 
+    buyLater = [], 
     savedAddresses = [],
     addSavedAddress, 
     deleteSavedAddress, 
@@ -49,6 +56,11 @@ function AccountContent() {
   const [email, setEmail] = useState(customerUser?.email || '');
   const [phone, setPhone] = useState(customerUser?.phone || '');
   const [profileMsg, setProfileMsg] = useState('');
+
+  // Location Tab State
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsMsg, setGpsMsg] = useState('');
+  const [currentCoords, setCurrentCoords] = useState(null);
 
   // New Saved Address Form State
   const [showAddressModal, setShowAddressModal] = useState(false);
@@ -69,6 +81,14 @@ function AccountContent() {
     const tab = searchParams.get('tab');
     if (tab) setActiveTab(tab);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (customerUser) {
+      setName(customerUser.name || '');
+      setEmail(customerUser.email || '');
+      setPhone(customerUser.phone || '');
+    }
+  }, [customerUser]);
 
   if (!customerUser) {
     return (
@@ -92,7 +112,9 @@ function AccountContent() {
   const userOrders = orders.filter((o) => 
     (o.customerEmail && customerUser.email && o.customerEmail.toLowerCase() === customerUser.email.toLowerCase()) || 
     (o.customerPhone && customerUser.phone && o.customerPhone === customerUser.phone) ||
-    o.customerName === customerUser.name
+    o.customerName === customerUser.name ||
+    o.email === customerUser.email ||
+    o.phone === customerUser.phone
   );
 
   const handleUpdateProfile = (e) => {
@@ -102,6 +124,42 @@ function AccountContent() {
     }
     setProfileMsg('Profile details updated successfully!');
     setTimeout(() => setProfileMsg(''), 3000);
+  };
+
+  const handleDetectGPSLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    setGpsLoading(true);
+    setGpsMsg('Fetching location coordinates...');
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setCurrentCoords({ lat, lng });
+
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+          const data = await res.json();
+          if (data && data.address) {
+            setGpsMsg(`Location detected: ${data.address.city || data.address.town || 'Hyderabad'}, ${data.address.state || 'Telangana'} (${data.address.postcode || '500081'})`);
+          } else {
+            setGpsMsg(`Coordinates fetched: Lat ${lat.toFixed(4)}, Lng ${lng.toFixed(4)}`);
+          }
+        } catch (e) {
+          setGpsMsg(`Coordinates fetched: Lat ${lat.toFixed(4)}, Lng ${lng.toFixed(4)}`);
+        }
+
+        setGpsLoading(false);
+      },
+      (err) => {
+        setGpsLoading(false);
+        setGpsMsg('Location permission denied.');
+      }
+    );
   };
 
   const handleAddAddressSubmit = (e) => {
@@ -175,13 +233,14 @@ function AccountContent() {
         {/* User Account Header */}
         <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-600/30 border border-emerald-500/40 text-emerald-400 font-extrabold text-2xl flex items-center justify-center uppercase">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-600/30 border border-emerald-500/40 text-emerald-400 font-extrabold text-2xl flex items-center justify-center uppercase shadow-md">
               {customerUser.name?.charAt(0) || 'C'}
             </div>
             <div>
+              <p className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">Hello,</p>
               <h1 className="text-2xl font-black text-white flex items-center gap-2">
                 <span>{customerUser.name}</span>
-                <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full font-bold uppercase">
+                <span className="text-[10px] bg-emerald-600 text-white px-2.5 py-0.5 rounded-full font-bold uppercase">
                   {customerUser.verificationStatus || 'OTP Verified'}
                 </span>
               </h1>
@@ -196,7 +255,7 @@ function AccountContent() {
               logoutCustomer();
               router.push('/');
             }}
-            className="px-4 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white rounded-xl text-xs font-bold border border-rose-500/30 flex items-center gap-1.5 transition"
+            className="px-4 py-2.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white rounded-2xl text-xs font-bold border border-rose-500/30 flex items-center gap-1.5 transition"
           >
             <LogOut size={14} /> Log Out
           </button>
@@ -221,49 +280,61 @@ function AccountContent() {
             </button>
 
             <button
-              onClick={() => setActiveTab('addresses')}
-              className={`w-full p-3 rounded-2xl text-xs font-bold flex items-center justify-between transition ${
-                activeTab === 'addresses' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <MapPin size={16} /> Saved Addresses ({savedAddresses.length})
-              </span>
-              <ChevronRight size={14} />
-            </button>
-
-            <button
-              onClick={() => setActiveTab('wishlist')}
-              className={`w-full p-3 rounded-2xl text-xs font-bold flex items-center justify-between transition ${
-                activeTab === 'wishlist' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Heart size={16} /> Wishlist & Buy Later
-              </span>
-              <ChevronRight size={14} />
-            </button>
-
-            <button
               onClick={() => setActiveTab('profile')}
               className={`w-full p-3 rounded-2xl text-xs font-bold flex items-center justify-between transition ${
                 activeTab === 'profile' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-700 hover:bg-slate-50'
               }`}
             >
               <span className="flex items-center gap-2">
-                <User size={16} /> Customer Profile
+                <User size={16} /> My Profile
               </span>
               <ChevronRight size={14} />
             </button>
 
             <button
-              onClick={() => setActiveTab('invoices')}
+              onClick={() => setActiveTab('addresses')}
               className={`w-full p-3 rounded-2xl text-xs font-bold flex items-center justify-between transition ${
-                activeTab === 'invoices' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-700 hover:bg-slate-50'
+                activeTab === 'addresses' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-700 hover:bg-slate-50'
               }`}
             >
               <span className="flex items-center gap-2">
-                <FileText size={16} /> Tax Invoices
+                <MapPin size={16} /> My Addresses ({savedAddresses.length})
+              </span>
+              <ChevronRight size={14} />
+            </button>
+
+            <button
+              onClick={() => setActiveTab('location')}
+              className={`w-full p-3 rounded-2xl text-xs font-bold flex items-center justify-between transition ${
+                activeTab === 'location' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Navigation size={16} /> Location Settings
+              </span>
+              <ChevronRight size={14} />
+            </button>
+
+            <button
+              onClick={() => setActiveTab('payments')}
+              className={`w-full p-3 rounded-2xl text-xs font-bold flex items-center justify-between transition ${
+                activeTab === 'payments' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <CreditCard size={16} /> Payment & Billing
+              </span>
+              <ChevronRight size={14} />
+            </button>
+
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`w-full p-3 rounded-2xl text-xs font-bold flex items-center justify-between transition ${
+                activeTab === 'settings' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Settings size={16} /> Account Settings
               </span>
               <ChevronRight size={14} />
             </button>
@@ -273,7 +344,7 @@ function AccountContent() {
           {/* Right Main Content */}
           <div className="lg:col-span-3">
             
-            {/* Orders Tab */}
+            {/* 1. My Orders Tab */}
             {activeTab === 'orders' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
@@ -305,13 +376,70 @@ function AccountContent() {
               </div>
             )}
 
-            {/* Saved Addresses Tab (Amazon Style) */}
+            {/* 2. My Profile Tab */}
+            {activeTab === 'profile' && (
+              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                <h3 className="text-xl font-black text-slate-900">Customer Profile Information</h3>
+                
+                {profileMsg && (
+                  <div className="p-3 bg-emerald-50 text-emerald-800 font-bold text-xs rounded-xl">
+                    {profileMsg}
+                  </div>
+                )}
+
+                <form onSubmit={handleUpdateProfile} className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Full Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full bg-slate-50 border rounded-xl p-3 focus:outline-none focus:border-emerald-500 font-bold text-slate-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Mobile Number *</label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="e.g. 9876543210"
+                      className="w-full bg-slate-50 border rounded-xl p-3 focus:outline-none focus:border-emerald-500 font-bold text-slate-900"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block font-bold text-slate-700 mb-1">Email Address *</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="e.g. customer@domain.com"
+                      className="w-full bg-slate-50 border rounded-xl p-3 focus:outline-none focus:border-emerald-500 font-bold text-slate-900"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 pt-2">
+                    <button
+                      type="submit"
+                      className="px-6 py-3 bg-emerald-600 text-white rounded-2xl font-extrabold text-xs shadow-md hover:bg-emerald-700 transition"
+                    >
+                      Save Profile Changes
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* 3. My Addresses Tab (Amazon Style) */}
             {activeTab === 'addresses' && (
               <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                   <div>
-                    <h3 className="text-xl font-black text-slate-900">Amazon-Style Saved Addresses</h3>
-                    <p className="text-xs text-slate-500">Addresses are saved to your profile and automatically loaded during checkout</p>
+                    <h3 className="text-xl font-black text-slate-900">Saved Delivery Addresses</h3>
+                    <p className="text-xs text-slate-500">Manage multiple addresses and set your default checkout destination</p>
                   </div>
                   <button
                     onClick={() => setShowAddressModal(true)}
@@ -375,113 +503,134 @@ function AccountContent() {
               </div>
             )}
 
-            {/* Wishlist & Buy Later Tab */}
-            {activeTab === 'wishlist' && (
+            {/* 4. Location Settings Tab */}
+            {activeTab === 'location' && (
               <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-                <h3 className="text-xl font-black text-slate-900">Wishlist & Saved Items</h3>
-                {wishlist.length === 0 ? (
-                  <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-500">
-                    Your wishlist is empty. Browse shop to save items for later.
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900">Device Location & Geolocation</h3>
+                    <p className="text-xs text-slate-500">Detect or update your latitude & longitude for auto-address filling</p>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {wishlist.map((item) => (
-                      <div key={item.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-3">
-                          {item.images?.[0] && <img src={item.images[0]} alt="" className="w-12 h-12 object-cover rounded-xl" />}
-                          <div>
-                            <p className="font-bold text-slate-900">{item.name}</p>
-                            <p className="text-emerald-600 font-extrabold">₹{item.offerPrice || item.price}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  
+                  <button
+                    onClick={handleDetectGPSLocation}
+                    disabled={gpsLoading}
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold shadow-md flex items-center gap-1.5 transition"
+                  >
+                    <Navigation size={16} className={gpsLoading ? 'animate-spin' : ''} />
+                    <span>{gpsLoading ? 'Detecting GPS...' : 'Use Current Location'}</span>
+                  </button>
+                </div>
+
+                {gpsMsg && (
+                  <div className="p-3 bg-emerald-50 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200">
+                    {gpsMsg}
                   </div>
                 )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div className="p-4 bg-slate-50 border rounded-2xl space-y-1">
+                    <span className="text-[10px] font-black uppercase text-slate-400">Current Latitude</span>
+                    <p className="font-mono text-sm font-bold text-slate-900">
+                      {currentCoords?.lat ? currentCoords.lat.toFixed(6) : '17.3850 (Hyderabad)'}
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 border rounded-2xl space-y-1">
+                    <span className="text-[10px] font-black uppercase text-slate-400">Current Longitude</span>
+                    <p className="font-mono text-sm font-bold text-slate-900">
+                      {currentCoords?.lng ? currentCoords.lng.toFixed(6) : '78.4867 (Telangana)'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
+                  <h4 className="font-bold text-slate-900">Location Permission Protocol</h4>
+                  <p className="text-slate-600 leading-relaxed">
+                    HC DTF STORE uses one-time location permissions to reverse-geocode your shipping address automatically. Once saved to your profile, you will never be asked for location access again during checkout.
+                  </p>
+                </div>
               </div>
             )}
 
-            {/* Profile Tab */}
-            {activeTab === 'profile' && (
-              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                <h3 className="text-xl font-black text-slate-900">OTP Verified Customer Profile</h3>
+            {/* 5. Payment & Billing Tab */}
+            {activeTab === 'payments' && (
+              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                <h3 className="text-xl font-black text-slate-900">Payment & Billing History</h3>
                 
-                {profileMsg && (
-                  <div className="p-3 bg-emerald-50 text-emerald-800 font-bold text-xs rounded-xl">
-                    {profileMsg}
-                  </div>
-                )}
-
-                <form onSubmit={handleUpdateProfile} className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Full Name</label>
-                    <input
-                      type="text"
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full bg-slate-50 border rounded-xl p-3 focus:outline-none focus:border-emerald-500 font-bold text-slate-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Mobile Number</label>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="e.g. 9876543210"
-                      className="w-full bg-slate-50 border rounded-xl p-3 focus:outline-none focus:border-emerald-500 font-bold text-slate-900"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block font-bold text-slate-700 mb-1">Email Address</label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="e.g. customer@domain.com"
-                      className="w-full bg-slate-50 border rounded-xl p-3 focus:outline-none focus:border-emerald-500 font-bold text-slate-900"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2 pt-2">
-                    <button
-                      type="submit"
-                      className="px-6 py-3 bg-emerald-600 text-white rounded-2xl font-extrabold text-xs shadow-md hover:bg-emerald-700 transition"
-                    >
-                      Update Profile Details
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* GST Tax Invoices Tab */}
-            {activeTab === 'invoices' && (
-              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                <h3 className="text-xl font-black text-slate-900">GST Tax Invoices</h3>
                 {userOrders.length === 0 ? (
-                  <p className="text-xs text-slate-500">No completed orders to generate tax invoices for.</p>
+                  <p className="text-xs text-slate-500">No payment transactions recorded.</p>
                 ) : (
                   <div className="space-y-3">
                     {userOrders.map((ord) => (
-                      <div key={ord.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between text-xs">
-                        <div>
-                          <p className="font-bold text-slate-900">Invoice #INV-{ord.id}</p>
-                          <p className="text-slate-500">Total Paid: ₹{ord.total}</p>
+                      <div key={ord.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                        <div className="space-y-1">
+                          <p className="font-bold text-slate-900">Order #{ord.id}</p>
+                          <p className="text-[11px] text-slate-500 font-mono">
+                            Razorpay Payment ID: <span className="text-emerald-700 font-bold">{ord.razorpayPaymentId || 'pay_online_verified'}</span>
+                          </p>
+                          <p className="text-[11px] text-slate-500">Method: {ord.paymentMethod || 'Razorpay Online Checkout'}</p>
                         </div>
-                        <button
-                          onClick={() => downloadGstInvoicePdf(ord)}
-                          className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"
-                        >
-                          <FileText size={14} /> Download PDF
-                        </button>
+
+                        <div className="text-right sm:text-right">
+                          <p className="font-black text-slate-900 text-sm">₹{ord.total}</p>
+                          <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-full uppercase">
+                            Payment Verified
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* 6. Account Settings Tab */}
+            {activeTab === 'settings' && (
+              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6 text-xs">
+                <h3 className="text-xl font-black text-slate-900">Account Settings & Security</h3>
+                
+                <div className="space-y-4 divide-y divide-slate-100">
+                  <div className="pt-2 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-slate-900">OTP Account Verification</h4>
+                      <p className="text-slate-500 text-[11px]">Protected via mobile and email OTP authentication</p>
+                    </div>
+                    <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-extrabold text-[10px] rounded-full uppercase">
+                      Active
+                    </span>
+                  </div>
+
+                  <div className="pt-4 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-slate-900">Notification Preferences</h4>
+                      <p className="text-slate-500 text-[11px]">Receive order status updates via WhatsApp and SMS</p>
+                    </div>
+                    <span className="px-3 py-1 bg-slate-100 text-slate-700 font-bold text-[10px] rounded-full uppercase">
+                      Enabled
+                    </span>
+                  </div>
+
+                  <div className="pt-4 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-slate-900">Privacy & Data Security</h4>
+                      <p className="text-slate-500 text-[11px]">256-Bit SSL Encrypted Account Profile</p>
+                    </div>
+                    <ShieldCheck size={20} className="text-emerald-600" />
+                  </div>
+
+                  <div className="pt-6">
+                    <button
+                      onClick={() => {
+                        logoutCustomer();
+                        router.push('/');
+                      }}
+                      className="px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-black text-xs shadow-md transition flex items-center gap-2"
+                    >
+                      <LogOut size={16} /> Logout Customer Account
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 

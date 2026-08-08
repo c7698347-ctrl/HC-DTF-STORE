@@ -19,7 +19,10 @@ import {
   Check,
   PhoneCall,
   Tag,
-  Wrench
+  Wrench,
+  MapPin,
+  CreditCard,
+  Settings
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import { LANGUAGES } from '@/lib/i18n';
@@ -32,9 +35,11 @@ export default function Header() {
     categories = [], 
     cart = [], 
     wishlist = [], 
-    currentUser, 
+    customerUser,
+    currentUser,
     logoutCustomer,
     setIsCartOpen,
+    setIsAuthOpen,
     setIsAuthModalOpen,
     settings = {}
   } = useStore();
@@ -42,6 +47,9 @@ export default function Header() {
   const [isDrawerMenuOpen, setIsDrawerMenuOpen] = useState(false);
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
+
+  const activeCustomer = customerUser || currentUser;
+  const openAuth = setIsAuthModalOpen || setIsAuthOpen;
 
   const totalCartCount = (cart || []).reduce((sum, item) => sum + (item.quantity || 1), 0);
   const activeLangObj = LANGUAGES.find((l) => l.code === lang) || LANGUAGES[0];
@@ -164,48 +172,68 @@ export default function Header() {
                 )}
               </button>
 
-              {/* 👤 My Account */}
+              {/* 👤 My Account / OTP Login */}
               <div className="relative">
                 <button
-                  onClick={() => setIsAccountDropdownOpen(!isAccountDropdownOpen)}
-                  className="flex items-center gap-2 p-2 rounded-2xl text-slate-700 hover:bg-slate-100 transition"
+                  onClick={() => {
+                    if (!activeCustomer) {
+                      if (openAuth) openAuth(true);
+                    } else {
+                      setIsAccountDropdownOpen(!isAccountDropdownOpen);
+                    }
+                  }}
+                  className="flex items-center gap-2 p-2 sm:px-3 sm:py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-900 transition font-bold text-xs"
                   aria-label="User Account"
                 >
-                  <User size={20} />
+                  <User size={18} className="text-emerald-600" />
+                  <span className="hidden sm:inline truncate max-w-[120px]">
+                    {activeCustomer ? activeCustomer.name : 'Sign In via OTP'}
+                  </span>
                 </button>
 
-                {isAccountDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-50">
-                    {currentUser ? (
-                      <>
-                        <div className="p-3 bg-slate-50 rounded-xl mb-2">
-                          <p className="text-xs font-extrabold text-slate-900 truncate">{currentUser.name}</p>
-                          <p className="text-[11px] text-slate-500 truncate">{currentUser.email || currentUser.phone}</p>
-                        </div>
-                        <Link href="/account" onClick={() => setIsAccountDropdownOpen(false)} className="block px-3 py-2 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition">
-                          My Account Dashboard
-                        </Link>
-                        <button
-                          onClick={() => {
-                            logoutCustomer();
-                            setIsAccountDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl transition flex items-center gap-2"
-                        >
-                          <LogOut size={14} /> Logout
-                        </button>
-                      </>
-                    ) : (
+                {isAccountDropdownOpen && activeCustomer && (
+                  <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2.5 z-50 space-y-1">
+                    <div className="p-3 bg-slate-50 rounded-xl mb-1 border border-slate-100">
+                      <p className="text-[10px] font-black uppercase text-emerald-600 tracking-wider">Hello,</p>
+                      <p className="text-xs font-black text-slate-900 truncate">{activeCustomer.name}</p>
+                      <p className="text-[10px] text-slate-500 truncate">{activeCustomer.email || activeCustomer.phone}</p>
+                    </div>
+
+                    <Link href="/account?tab=orders" onClick={() => setIsAccountDropdownOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition">
+                      <Package size={15} className="text-emerald-600" /> My Orders & Tracking
+                    </Link>
+
+                    <Link href="/account?tab=profile" onClick={() => setIsAccountDropdownOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition">
+                      <User size={15} className="text-emerald-600" /> My Profile
+                    </Link>
+
+                    <Link href="/account?tab=addresses" onClick={() => setIsAccountDropdownOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition">
+                      <MapPin size={15} className="text-emerald-600" /> Saved Delivery Addresses
+                    </Link>
+
+                    <Link href="/account?tab=location" onClick={() => setIsAccountDropdownOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition">
+                      <MapPin size={15} className="text-emerald-600" /> Location Settings
+                    </Link>
+
+                    <Link href="/account?tab=payments" onClick={() => setIsAccountDropdownOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition">
+                      <CreditCard size={15} className="text-emerald-600" /> Payment & Billing
+                    </Link>
+
+                    <Link href="/account?tab=settings" onClick={() => setIsAccountDropdownOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl transition">
+                      <Settings size={15} className="text-emerald-600" /> Account Settings
+                    </Link>
+
+                    <div className="pt-1 border-t border-slate-100">
                       <button
                         onClick={() => {
-                          setIsAuthModalOpen(true);
+                          logoutCustomer();
                           setIsAccountDropdownOpen(false);
                         }}
-                        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-md"
+                        className="w-full text-left px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl transition flex items-center gap-2"
                       >
-                        Sign In via OTP
+                        <LogOut size={15} /> Logout Account
                       </button>
-                    )}
+                    </div>
                   </div>
                 )}
               </div>

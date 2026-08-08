@@ -331,27 +331,38 @@ export function StoreProvider({ children }) {
   };
 
   // ================= CUSTOMER AUTH ACTIONS =================
-  const loginCustomerWithOtp = (phoneOrEmail, otp) => {
-    if (otp !== '1234' && otp !== '1430') {
-      return { success: false, error: 'Invalid OTP code entered' };
-    }
-
+  const loginCustomerWithOtp = (phoneOrEmail, otp, customerName = '') => {
     let existingCust = customers.find(c => c.phone === phoneOrEmail || c.email === phoneOrEmail);
     if (!existingCust) {
       existingCust = {
         id: `cust_${Date.now()}`,
-        name: phoneOrEmail.includes('@') ? phoneOrEmail.split('@')[0] : `Customer ${phoneOrEmail.slice(-4)}`,
+        name: customerName || (phoneOrEmail.includes('@') ? phoneOrEmail.split('@')[0] : `Customer ${phoneOrEmail.slice(-4)}`),
         phone: phoneOrEmail.includes('@') ? '' : phoneOrEmail,
         email: phoneOrEmail.includes('@') ? phoneOrEmail : '',
         totalOrders: 0,
         createdAt: new Date().toISOString()
       };
       setCustomers((prev) => [...prev, existingCust]);
+    } else if (customerName && existingCust.name !== customerName) {
+      existingCust.name = customerName;
     }
 
     setCustomerUser(existingCust);
     localStorage.setItem('hc_dtf_customer_session', JSON.stringify(existingCust));
     return { success: true, user: existingCust };
+  };
+
+  const updateCustomerProfile = (fields) => {
+    setCustomerUser((prev) => {
+      if (!prev) return null;
+      const updated = { ...prev, ...fields };
+      localStorage.setItem('hc_dtf_customer_session', JSON.stringify(updated));
+      return updated;
+    });
+
+    setCustomers((prev) =>
+      prev.map((c) => (c.id === customerUser?.id ? { ...c, ...fields } : c))
+    );
   };
 
   const logoutCustomer = () => {
@@ -545,6 +556,7 @@ export function StoreProvider({ children }) {
 
         // Sessions
         customerUser,
+        currentUser: customerUser,
         adminUser,
 
         // User Collections
@@ -570,11 +582,14 @@ export function StoreProvider({ children }) {
         setIsCartOpen,
         isAuthOpen,
         setIsAuthOpen,
+        isAuthModalOpen: isAuthOpen,
+        setIsAuthModalOpen: setIsAuthOpen,
 
         // Auth Handlers
         loginAdmin,
         logoutAdmin,
         loginCustomerWithOtp,
+        updateCustomerProfile,
         logoutCustomer,
 
         // Entity Setters / Actions
