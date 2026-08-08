@@ -9,8 +9,17 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invalid order amount' }, { status: 400 });
     }
 
-    const key_id = process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_HC_DTF_STORE';
-    const key_secret = process.env.RAZORPAY_KEY_SECRET || 'HC_DTF_STORE_SECRET';
+    const key_id = process.env.RAZORPAY_KEY_ID;
+    const key_secret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!key_id || !key_secret) {
+      return NextResponse.json(
+        { 
+          error: 'Razorpay API credentials not configured. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env.local and restart dev server.' 
+        }, 
+        { status: 500 }
+      );
+    }
 
     const instance = new Razorpay({
       key_id,

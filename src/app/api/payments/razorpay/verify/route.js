@@ -9,7 +9,14 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Missing required Razorpay verification payload' }, { status: 400 });
     }
 
-    const key_secret = process.env.RAZORPAY_KEY_SECRET || 'HC_DTF_STORE_SECRET';
+    const key_secret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!key_secret) {
+      return NextResponse.json(
+        { error: 'Razorpay secret key not configured in .env.local' },
+        { status: 500 }
+      );
+    }
 
     const generated_signature = crypto
       .createHmac('sha256', key_secret)
