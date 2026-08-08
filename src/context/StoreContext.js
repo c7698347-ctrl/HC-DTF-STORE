@@ -11,9 +11,9 @@ import {
   INITIAL_FLASH_SALE,
   INITIAL_MACHINE_CONFIG,
   INITIAL_MACHINES_LIST,
+  INITIAL_SHIPPING_RULES,
   DEFAULT_ADMIN,
   TRACKING_STAGES,
-  STATE_SHIPPING_RATES,
   getShippingChargeForState
 } from '@/lib/store';
 import { getTranslation, LANGUAGES } from '@/lib/i18n';
@@ -32,6 +32,7 @@ export function StoreProvider({ children }) {
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
   const [customers, setCustomers] = useState(INITIAL_CUSTOMERS);
   const [orders, setOrders] = useState(INITIAL_ORDERS);
+  const [shippingRules, setShippingRules] = useState(INITIAL_SHIPPING_RULES);
 
   // 3. Centralized Machine Module Data Architecture
   const [machineConfig, setMachineConfigState] = useState(INITIAL_MACHINE_CONFIG);
@@ -66,15 +67,13 @@ export function StoreProvider({ children }) {
   const taxableTotal = Math.max(0, cartSubtotal - couponDiscount);
   const gstAmount = 0; // ZERO GST GUARANTEE
 
-  // State-Wise Shipping Fee Helper
+  // Dynamic Admin Shipping Fee Lookup
   const getShippingFeeForState = (stateName) => {
     if (cartSubtotal === 0) return 0;
-    if (cartSubtotal > (settings.freeShippingAbove || 999)) return 0;
-    const ratesMap = settings.stateShippingRates || STATE_SHIPPING_RATES;
-    return getShippingChargeForState(stateName, ratesMap);
+    return getShippingChargeForState(stateName, shippingRules);
   };
 
-  const defaultShippingFee = cartSubtotal > (settings.freeShippingAbove || 999) || cartSubtotal === 0 ? 0 : 150;
+  const defaultShippingFee = 150;
   const cartTotal = taxableTotal + defaultShippingFee;
 
   // Fetch products from single database API (/api/products)
@@ -119,6 +118,12 @@ export function StoreProvider({ children }) {
         setSettings((prev) => ({ ...prev, ...parsed }));
       }
 
+      // Shipping Rules Persistence Load
+      const savedShippingRules = localStorage.getItem('hc_dtf_shipping_rules');
+      if (savedShippingRules) {
+        setShippingRules(JSON.parse(savedShippingRules));
+      }
+
       // Machine Module Persistence Load
       const savedMachineConfig = localStorage.getItem('hc_dtf_machine_config');
       if (savedMachineConfig) {
@@ -159,6 +164,10 @@ export function StoreProvider({ children }) {
   }, [settings]);
 
   useEffect(() => {
+    localStorage.setItem('hc_dtf_shipping_rules', JSON.stringify(shippingRules));
+  }, [shippingRules]);
+
+  useEffect(() => {
     localStorage.setItem('hc_dtf_machine_config', JSON.stringify(machineConfig));
   }, [machineConfig]);
 
@@ -168,6 +177,34 @@ export function StoreProvider({ children }) {
 
   // Helper i18n Translation getter
   const t = (key) => getTranslation(currentLanguage, key);
+
+  // ================= SHIPPING RULES ACTIONS =================
+  const addShippingRule = (ruleData) => {
+    const created = {
+      id: `ship_${Date.now()}`,
+      state: ruleData.state.trim(),
+      charge: Number(ruleData.charge),
+      enabled: ruleData.enabled !== undefined ? ruleData.enabled : true
+    };
+    setShippingRules((prev) => [...prev, created]);
+    return created;
+  };
+
+  const updateShippingRule = (id, fields) => {
+    setShippingRules((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...fields, charge: fields.charge !== undefined ? Number(fields.charge) : r.charge } : r))
+    );
+  };
+
+  const deleteShippingRule = (id) => {
+    setShippingRules((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const toggleShippingRuleStatus = (id) => {
+    setShippingRules((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r))
+    );
+  };
 
   // ================= MACHINE MODULE ACTIONS =================
   const setMachineConfig = (newConfig) => {
@@ -260,7 +297,6 @@ export function StoreProvider({ children }) {
     };
     setProducts((prev) => [created, ...prev]);
 
-    // Save to Database API asynchronously
     fetch('/api/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -275,7 +311,6 @@ export function StoreProvider({ children }) {
       prev.map((p) => (p.id === id ? { ...p, ...updatedFields } : p))
     );
 
-    // Save to Database API asynchronously
     fetch('/api/products', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -286,7 +321,6 @@ export function StoreProvider({ children }) {
   const deleteProduct = (id) => {
     setProducts((prev) => prev.filter((p) => p.id !== id));
 
-    // Delete from Database API asynchronously
     fetch('/api/products', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -322,7 +356,6 @@ export function StoreProvider({ children }) {
   const addOrder = (orderObj) => {
     setOrders((prev) => [orderObj, ...prev]);
 
-    // Update customer total orders
     if (orderObj.email || orderObj.phone) {
       setCustomers((prev) =>
         prev.map((c) => {
@@ -413,6 +446,13 @@ export function StoreProvider({ children }) {
         settings,
         customers,
         orders,
+        shippingRules,
+
+        // Shipping Rules CRUD
+        addShippingRule,
+        updateShippingRule,
+        deleteShippingRule,
+        toggleShippingRuleStatus,
 
         // Machine Module (Centralized Data Architecture)
         machineConfig,

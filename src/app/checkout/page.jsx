@@ -18,7 +18,8 @@ import {
   Navigation,
   User,
   Phone,
-  Mail
+  Mail,
+  AlertTriangle
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import { jsPDF } from 'jspdf';
@@ -46,7 +47,6 @@ export default function CheckoutPage() {
     customerUser, 
     loginCustomerWithOtp,
     addOrder,
-    settings = {},
     getShippingFeeForState,
     products = [],
     updateProduct
@@ -103,7 +103,6 @@ export default function CheckoutPage() {
       (position) => {
         setGpsLoading(false);
         setGpsMsg('GPS Coordinates fetched! Defaulted to Telangana / Hyderabad region.');
-        // Default smart region fill
         setCity('Hyderabad');
         setDistrict('Hyderabad');
         setState('Telangana');
@@ -136,13 +135,12 @@ export default function CheckoutPage() {
     }
   };
 
-  // Shipping Fee & Financial Calculations (Admin Controlled, No Customer Discounts, No GST)
-  const freeShippingThreshold = settings.freeShippingAbove || 999;
-  const adminDefaultShipping = settings.shippingCharges || 150;
-  
+  // Dynamic Admin Shipping Fee Lookup (NO HARDCODED FALLBACKS)
+  const shippingFee = getShippingFeeForState(state);
+  const isShippingUnavailable = shippingFee === null || shippingFee === undefined;
+
   const subtotal = cart.reduce((acc, item) => acc + (item.offerPrice || item.price) * item.quantity, 0);
-  const shippingFee = subtotal >= freeShippingThreshold || subtotal === 0 ? 0 : (getShippingFeeForState(state) || adminDefaultShipping);
-  const grandTotal = Number((subtotal + shippingFee).toFixed(2));
+  const grandTotal = Number((subtotal + (isShippingUnavailable ? 0 : shippingFee)).toFixed(2));
 
   const generatePDFInvoice = (order) => {
     const doc = new jsPDF();
@@ -182,6 +180,11 @@ export default function CheckoutPage() {
     e.preventDefault();
     setPaymentError('');
 
+    if (isShippingUnavailable) {
+      setPaymentError('Shipping is currently unavailable for this location. Please contact support.');
+      return;
+    }
+
     if (!customerUser) {
       alert('Mandatory Login Required: Please sign in to your customer account before proceeding to payment.');
       return;
@@ -200,7 +203,6 @@ export default function CheckoutPage() {
     setIsProcessingPayment(true);
 
     try {
-      // 1. Load Razorpay script
       const resScript = await loadRazorpayScript();
       if (!resScript) {
         setIsProcessingPayment(false);
@@ -208,7 +210,6 @@ export default function CheckoutPage() {
         return;
       }
 
-      // 2. Create Razorpay order via Next.js API
       const resOrder = await fetch('/api/payments/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -219,7 +220,9 @@ export default function CheckoutPage() {
           notes: {
             customerName: fullName,
             phone: mobile,
-            email: email
+            email: email,
+            state: state,
+            shippingFee: shippingFee
           }
         })
       });
@@ -232,7 +235,6 @@ export default function CheckoutPage() {
         return;
       }
 
-      // 3. Configure official Razorpay Checkout Options
       const options = {
         key: orderData.key_id,
         amount: orderData.amount,
@@ -250,13 +252,11 @@ export default function CheckoutPage() {
           address: `${houseFlatNo}, ${street}, ${area}, ${city}, ${state} - ${pincode}`
         },
         theme: {
-          color: '#059669' // Emerald theme matching HC DTF STORE
+          color: '#059669'
         },
 
-        // Payment Success Handler
         handler: async function (response) {
           try {
-            // Verify payment signature
             await fetch('/api/payments/razorpay/verify', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -269,7 +269,6 @@ export default function CheckoutPage() {
 
             const finalPaymentId = response.razorpay_payment_id;
 
-            // Reduce stock automatically for items ordered
             cart.forEach((cartItem) => {
               const targetProd = products.find((p) => p.id === cartItem.id);
               if (targetProd && updateProduct) {
@@ -278,7 +277,6 @@ export default function CheckoutPage() {
               }
             });
 
-            // Create Sequential Order ID
             const newOrderObj = {
               id: `HC-ORD-${Math.floor(100000 + Math.random() * 900000)}`,
               createdAt: new Date().toISOString(),
@@ -326,7 +324,6 @@ export default function CheckoutPage() {
         }
       };
 
-      // 4. Launch official Razorpay Checkout Modal
       const rzp = new window.Razorpay(options);
 
       rzp.on('payment.failed', function (response) {
@@ -349,7 +346,6 @@ export default function CheckoutPage() {
       <div className="py-16 bg-slate-50 min-h-screen">
         <div className="max-w-2xl mx-auto px-4">
           <div className="bg-white p-8 sm:p-12 rounded-3xl border border-slate-200 shadow-2xl text-center space-y-6">
-            
             <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-md">
               <Check size={40} />
             </div>
@@ -653,21 +649,14 @@ export default function CheckoutPage() {
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">State *</label>
-                  <select
+                  <input
+                    type="text"
+                    required
                     value={state}
                     onChange={(e) => setState(e.target.value)}
+                    placeholder="Enter state"
                     className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 font-bold text-slate-900 focus:outline-none focus:border-emerald-500"
-                  >
-                    <option value="Andhra Pradesh">Andhra Pradesh (₹150)</option>
-                    <option value="Telangana">Telangana (₹150)</option>
-                    <option value="Tamil Nadu">Tamil Nadu (₹180)</option>
-                    <option value="Karnataka">Karnataka (₹180)</option>
-                    <option value="Kerala">Kerala (₹200)</option>
-                    <option value="Maharashtra">Maharashtra (₹200)</option>
-                    <option value="Gujarat">Gujarat (₹200)</option>
-                    <option value="Delhi">Delhi (₹200)</option>
-                    <option value="Other States">Other States (₹200)</option>
-                  </select>
+                  />
                 </div>
 
                 <div className="space-y-1">
@@ -706,9 +695,9 @@ export default function CheckoutPage() {
             {/* Official Razorpay Pay Now Button */}
             <button
               type="submit"
-              disabled={isProcessingPayment || !acceptedNoReturnPolicy || !customerUser}
+              disabled={isProcessingPayment || !acceptedNoReturnPolicy || !customerUser || isShippingUnavailable}
               className={`w-full py-4 rounded-2xl text-xs sm:text-sm font-extrabold shadow-xl transition flex items-center justify-center gap-2.5 ${
-                acceptedNoReturnPolicy && customerUser && !isProcessingPayment
+                acceptedNoReturnPolicy && customerUser && !isShippingUnavailable && !isProcessingPayment
                   ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 hover:scale-[1.01] active:scale-95'
                   : 'bg-slate-300 text-slate-500 cursor-not-allowed'
               }`}
@@ -718,6 +707,8 @@ export default function CheckoutPage() {
                   <RefreshCw size={18} className="animate-spin text-white" />
                   <span>Opening Razorpay Secure Checkout Popup...</span>
                 </>
+              ) : isShippingUnavailable ? (
+                <span>Shipping Unavailable for {state}</span>
               ) : (
                 <>
                   <CreditCard size={20} />
@@ -748,34 +739,28 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              {/* Supported Payment Methods Badges */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
-                <span className="text-[10px] font-black uppercase text-slate-400 block tracking-wider">
-                  Supported Razorpay Payment Methods
-                </span>
-                <div className="flex flex-wrap gap-1.5 text-[10px] font-extrabold text-slate-700">
-                  <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg">Google Pay</span>
-                  <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg">PhonePe</span>
-                  <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg">Paytm</span>
-                  <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg">BHIM</span>
-                  <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg">CRED</span>
-                  <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg">Debit / Credit Cards</span>
-                  <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg">Net Banking</span>
-                  <span className="px-2 py-1 bg-white border border-slate-200 rounded-lg">Wallets</span>
-                </div>
-              </div>
-
-              {/* CLEAN SUMMARY BREAKDOWN: SUBTOTAL, SHIPPING, GRAND TOTAL ONLY */}
+              {/* DYNAMIC ADMIN SHIPPING FEE BREAKDOWN */}
               <div className="space-y-2 text-xs border-t border-slate-200 pt-3 text-slate-600">
                 <div className="flex justify-between">
                   <span>Products Subtotal</span>
                   <span className="font-bold text-slate-900">₹{subtotal.toLocaleString()}</span>
                 </div>
 
-                <div className="flex justify-between text-emerald-700 font-bold">
+                <div className="flex justify-between font-bold">
                   <span>State Delivery Charge ({state})</span>
-                  <span>{shippingFee === 0 ? 'FREE' : `₹${shippingFee}`}</span>
+                  {isShippingUnavailable ? (
+                    <span className="text-rose-600 font-extrabold">Unavailable</span>
+                  ) : (
+                    <span className="text-emerald-700">₹{shippingFee}</span>
+                  )}
                 </div>
+
+                {isShippingUnavailable && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-[11px] font-bold flex items-center gap-2">
+                    <AlertTriangle size={16} className="shrink-0" />
+                    <span>Shipping is currently unavailable for this location. Please contact support.</span>
+                  </div>
+                )}
 
                 <div className="flex justify-between border-t border-slate-200 pt-3 text-base font-black text-slate-900">
                   <span>Grand Total Amount</span>

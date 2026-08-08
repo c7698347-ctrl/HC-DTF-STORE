@@ -182,25 +182,42 @@ export const INITIAL_FLASH_SALE = {
   productIds: ['prod-101', 'prod-103']
 };
 
+// ADMIN-MANAGED DYNAMIC SHIPPING RULES MODEL
+export const INITIAL_SHIPPING_RULES = [
+  { id: 'ship_tg', state: 'Telangana', charge: 150, enabled: true },
+  { id: 'ship_ap', state: 'Andhra Pradesh', charge: 150, enabled: true },
+  { id: 'ship_tn', state: 'Tamil Nadu', charge: 180, enabled: true },
+  { id: 'ship_ka', state: 'Karnataka', charge: 180, enabled: true },
+  { id: 'ship_kl', state: 'Kerala', charge: 200, enabled: true },
+  { id: 'ship_mh', state: 'Maharashtra', charge: 200, enabled: true },
+  { id: 'ship_gj', state: 'Gujarat', charge: 200, enabled: true },
+  { id: 'ship_dl', state: 'Delhi', charge: 200, enabled: true },
+  { id: 'ship_oth', state: 'Other States', charge: 200, enabled: true }
+];
+
 export const STATE_SHIPPING_RATES = {
-  'Andhra Pradesh': 150,
   'Telangana': 150,
+  'Andhra Pradesh': 150,
   'Tamil Nadu': 180,
   'Karnataka': 180,
   'Kerala': 200,
   'Other States': 200
 };
 
-export const getShippingChargeForState = (stateName, stateRatesMap = STATE_SHIPPING_RATES) => {
-  if (!stateName) return 150;
-  const cleanState = stateName.trim().toLowerCase();
-  const rates = stateRatesMap || STATE_SHIPPING_RATES;
-  if (cleanState.includes('andhra')) return Number(rates['Andhra Pradesh']) || 150;
-  if (cleanState.includes('telangana')) return Number(rates['Telangana']) || 150;
-  if (cleanState.includes('tamil')) return Number(rates['Tamil Nadu']) || 180;
-  if (cleanState.includes('karnataka')) return Number(rates['Karnataka']) || 180;
-  if (cleanState.includes('kerala')) return Number(rates['Kerala']) || 200;
-  return Number(rates['Other States']) || 200;
+export const getShippingChargeForState = (stateName, rulesList = INITIAL_SHIPPING_RULES) => {
+  if (!stateName) return null;
+  const clean = stateName.trim().toLowerCase();
+  
+  const match = (rulesList || []).find((r) => {
+    const s = r.state.trim().toLowerCase();
+    return s === clean || clean.includes(s) || s.includes(clean);
+  });
+
+  if (match && match.enabled) {
+    return Number(match.charge);
+  }
+  
+  return null; // Return null if no enabled shipping rule exists
 };
 
 export const INITIAL_SETTINGS = {
