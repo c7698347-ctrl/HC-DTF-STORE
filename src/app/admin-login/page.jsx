@@ -30,13 +30,17 @@ export default function AdminLoginPage() {
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6 text-white">
         
-        {/* Portal Branding */}
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
-            <Lock size={26} />
+        {/* Official Uploaded Logo Branding */}
+        <div className="text-center space-y-3">
+          <img
+            src="/images/hc_official_logo.jpg"
+            alt="HC DTF STORE Official Logo"
+            className="h-20 w-auto mx-auto object-contain rounded-2xl border border-slate-800 shadow-xl"
+          />
+          <div>
+            <h1 className="text-xl font-black text-white tracking-tight">HC DTF STORE Portal</h1>
+            <p className="text-xs text-slate-400">Restricted Internal Store Administration</p>
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">HC DTF STORE Portal</h1>
-          <p className="text-xs text-slate-400">Restricted Internal Store Administration</p>
         </div>
 
         {errorMsg && (

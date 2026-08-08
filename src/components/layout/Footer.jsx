@@ -77,14 +77,13 @@ export default function Footer() {
         
         {/* Brand Column */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-800 flex items-center justify-center text-white font-black text-lg">
-              HC
-            </div>
-            <span className="font-black text-2xl text-white tracking-tight">
-              HC DTF <span className="text-emerald-400">STORE</span>
-            </span>
-          </div>
+          <Link href="/" className="inline-block">
+            <img
+              src="/images/hc_official_logo.jpg"
+              alt="HC DTF STORE Official Logo"
+              className="h-16 w-auto object-contain rounded-xl shadow-md"
+            />
+          </Link>
 
           <p className="text-xs text-slate-400 leading-relaxed max-w-md">
             India's premier manufacturer and supplier of ultra-high definition Direct-To-Film (DTF) transfer sheets, 3D gold zari blouse necklines, saree border rolls, and ready-to-press garment patches.

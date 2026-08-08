@@ -56,11 +56,13 @@ export default function AdminLayout({ children }) {
           
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-800 flex items-center justify-center font-extrabold text-white text-base shadow-md">
-              HC
-            </div>
+            <img
+              src="/images/hc_official_logo.jpg"
+              alt="HC DTF STORE Official Logo"
+              className="h-12 w-auto object-contain rounded-xl border border-slate-800 shadow-md"
+            />
             <div>
-              <h2 className="font-extrabold text-base text-white tracking-tight">HC DTF Admin</h2>
+              <h2 className="font-extrabold text-sm text-white tracking-tight">HC DTF Admin</h2>
               <p className="text-[10px] text-emerald-400 font-bold uppercase">Control Hub</p>
             </div>
           </div>

@@ -48,7 +48,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white shadow-xs">
-      {/* Top Announcement Bar - Strict Fast Delivery Specification */}
+      {/* Top Announcement Bar */}
       <div className="bg-slate-950 text-white text-xs py-2 px-4 border-b border-slate-800">
         <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
           <div className="flex items-center gap-2 font-medium">
@@ -74,7 +74,7 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Main Navbar (Header contains ONLY Menu, Logo, Language, Wishlist, Cart, My Account) */}
+      {/* Main Navbar */}
       <nav className="bg-white/95 backdrop-blur-md border-b border-slate-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20 gap-4">
@@ -89,22 +89,16 @@ export default function Header() {
               <span className="hidden sm:inline uppercase tracking-wider font-black">☰ Menu</span>
             </button>
 
-            {/* 2. Center HC DTF STORE Brand Logo */}
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-10 h-10 rounded-2xl bg-black flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform duration-300">
-                <span className="font-black text-lg tracking-tighter text-emerald-400">HC</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="font-black text-xl sm:text-2xl text-slate-900 tracking-tight">
-                  HC DTF <span className="text-emerald-600">STORE</span>
-                </span>
-                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-extrabold -mt-1">
-                  Premium DTF Printing
-                </span>
-              </div>
+            {/* 2. Official HC DTF STORE Uploaded Brand Logo */}
+            <Link href="/" className="flex items-center gap-2 group py-1">
+              <img
+                src="/images/hc_official_logo.jpg"
+                alt="HC DTF STORE Official Logo"
+                className="h-14 sm:h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-105 rounded-xl shadow-xs"
+              />
             </Link>
 
-            {/* 3. Right Action Icons (Language, Wishlist, Cart, Account ONLY - No Header Search) */}
+            {/* 3. Right Action Icons */}
             <div className="flex items-center gap-3 sm:gap-4">
               
               {/* 🌐 Language Selector */}
@@ -227,10 +221,12 @@ export default function Header() {
               
               {/* Drawer Header */}
               <div className="p-6 bg-slate-950 text-white flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black">
-                    HC
-                  </div>
+                <div className="flex items-center gap-3">
+                  <img
+                    src="/images/hc_official_logo.jpg"
+                    alt="HC DTF STORE Logo"
+                    className="h-12 w-auto object-contain rounded-lg"
+                  />
                   <div>
                     <h3 className="font-extrabold text-sm text-white">HC DTF STORE</h3>
                     <p className="text-[10px] text-slate-400">Premium DTF Transfers & Machinery</p>
@@ -247,7 +243,6 @@ export default function Header() {
               {/* Drawer Category Navigation List */}
               <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs font-bold text-slate-800">
                 
-                {/* DTF Transfer Collections */}
                 <div className="space-y-1">
                   <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider px-3 block mb-1">
                     DTF Transfer Collections
@@ -274,7 +269,6 @@ export default function Header() {
                   ))}
                 </div>
 
-                {/* Account & Orders */}
                 <div className="pt-3 border-t border-slate-100 space-y-1">
                   <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider px-3 block mb-1">
                     Quick Navigation
