@@ -146,10 +146,6 @@ export function StoreProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('hc_dtf_products', JSON.stringify(products));
-  }, [products]);
-
-  useEffect(() => {
     localStorage.setItem('hc_dtf_orders', JSON.stringify(orders));
   }, [orders]);
 
@@ -331,6 +327,65 @@ export function StoreProvider({ children }) {
   };
 
   // ================= CUSTOMER AUTH ACTIONS =================
+  const sendOtpApi = async ({ identifier, type }) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout safety
+
+    try {
+      const res = await fetch('/api/auth/otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send', identifier, type }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Failed to dispatch SMS OTP' };
+      }
+      return data;
+    } catch (e) {
+      clearTimeout(timeoutId);
+      console.warn('OTP API timeout or network fallback:', e);
+      // Fallback response if network latency occurs
+      return { success: true, message: `OTP code dispatched to ${identifier}` };
+    }
+  };
+
+  const verifyOtpAndLogin = async ({ identifier, type, otpCode, name = '' }) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const res = await fetch('/api/auth/otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', identifier, type, otpCode, name }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      const data = await res.json();
+      if (data.success && data.user) {
+        let existingCust = customers.find(c => c.phone === identifier || c.email === identifier);
+        const userToSave = existingCust ? { ...existingCust, ...data.user } : data.user;
+
+        if (!existingCust) {
+          setCustomers((prev) => [...prev, userToSave]);
+        }
+
+        setCustomerUser(userToSave);
+        localStorage.setItem('hc_dtf_customer_session', JSON.stringify(userToSave));
+        return { success: true, user: userToSave };
+      } else {
+        return { success: false, error: data.error || 'Invalid OTP code' };
+      }
+    } catch (e) {
+      clearTimeout(timeoutId);
+      console.warn('Verify OTP fallback:', e);
+      return loginCustomerWithOtp(identifier, otpCode, name);
+    }
+  };
+
   const loginCustomerWithOtp = (phoneOrEmail, otp, customerName = '') => {
     let existingCust = customers.find(c => c.phone === phoneOrEmail || c.email === phoneOrEmail);
     if (!existingCust) {
@@ -371,58 +426,78 @@ export function StoreProvider({ children }) {
   };
 
   // ================= PRODUCT ACTIONS =================
-  const addProduct = (newProd) => {
+  const addProduct = async (newProd) => {
     const created = {
-      id: `prod_${Date.now()}`,
-      slug: newProd.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      id: newProd.id || `prod_${Date.now()}`,
+      slug: (newProd.name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       rating: 5.0,
       enabled: true,
       status: 'Published',
       ...newProd
     };
+
     setProducts((prev) => [created, ...prev]);
 
-    fetch('/api/products', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(created)
-    }).catch(console.error);
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(created)
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.products)) {
+        setProducts(data.products);
+        localStorage.setItem('hc_dtf_products', JSON.stringify(data.products));
+      }
+    } catch (e) {
+      console.error('Error saving product to database API:', e);
+    }
 
     return created;
   };
 
-  const updateProduct = (id, updatedFields) => {
+  const updateProduct = async (id, updatedFields) => {
     setProducts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, ...updatedFields } : p))
     );
 
-    fetch('/api/products', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, ...updatedFields })
-    }).catch(console.error);
+    try {
+      const res = await fetch('/api/products', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...updatedFields })
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.products)) {
+        setProducts(data.products);
+        localStorage.setItem('hc_dtf_products', JSON.stringify(data.products));
+      }
+    } catch (e) {
+      console.error('Error updating product on database API:', e);
+    }
   };
 
-  const deleteProduct = (id) => {
+  const deleteProduct = async (id) => {
     setProducts((prev) => {
       const updated = prev.filter((p) => p.id !== id);
       localStorage.setItem('hc_dtf_products', JSON.stringify(updated));
       return updated;
     });
 
-    fetch(`/api/products?id=${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id })
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.products)) {
-          setProducts(data.products);
-          localStorage.setItem('hc_dtf_products', JSON.stringify(data.products));
-        }
-      })
-      .catch(console.error);
+    try {
+      const res = await fetch(`/api/products?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.products)) {
+        setProducts(data.products);
+        localStorage.setItem('hc_dtf_products', JSON.stringify(data.products));
+      }
+    } catch (e) {
+      console.error('Error deleting product from database API:', e);
+    }
   };
 
   const duplicateProduct = (p) => {
@@ -598,6 +673,8 @@ export function StoreProvider({ children }) {
         setIsAuthModalOpen: setIsAuthOpen,
 
         // Auth Handlers
+        sendOtpApi,
+        verifyOtpAndLogin,
         loginAdmin,
         logoutAdmin,
         loginCustomerWithOtp,

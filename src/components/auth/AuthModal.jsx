@@ -56,19 +56,29 @@ export default function AuthModal() {
     }
 
     setIsLoading(true);
-    const res = await sendOtpApi({ identifier: cleanIdent, type: otpType });
-    setIsLoading(false);
 
-    if (res.success) {
-      setStep('otp');
-      setCountdown(30);
-      setCanResend(false);
-      setOtpDigits(['', '', '', '', '', '']);
-      setTimeout(() => {
-        digitRefs[0].current?.focus();
-      }, 100);
-    } else {
-      setErrorMsg(res.error || 'Failed to send OTP code');
+    try {
+      if (typeof sendOtpApi !== 'function') {
+        throw new Error('OTP Service unavailable');
+      }
+
+      const res = await sendOtpApi({ identifier: cleanIdent, type: otpType });
+      if (res && res.success) {
+        setStep('otp');
+        setCountdown(30);
+        setCanResend(false);
+        setOtpDigits(['', '', '', '', '', '']);
+        setTimeout(() => {
+          digitRefs[0].current?.focus();
+        }, 100);
+      } else {
+        setErrorMsg(res?.error || 'Failed to dispatch OTP code. Please retry.');
+      }
+    } catch (err) {
+      console.error('OTP Send Error:', err);
+      setErrorMsg('Failed to dispatch SMS OTP. Please check connection and retry.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -108,31 +118,36 @@ export default function AuthModal() {
 
   const handleVerifyOtp = async (codeToVerify) => {
     const fullCode = codeToVerify || otpDigits.join('');
-    if (fullCode.length < 6) {
-      setErrorMsg('Please enter all 6 digits of the OTP code received via SMS');
+    if (fullCode.length < 4) {
+      setErrorMsg('Please enter the OTP code received via SMS');
       return;
     }
 
     setErrorMsg('');
     setIsLoading(true);
 
-    const res = await verifyOtpAndLogin({
-      identifier: identifier.trim(),
-      type: otpType,
-      otpCode: fullCode
-    });
+    try {
+      const res = await verifyOtpAndLogin({
+        identifier: identifier.trim(),
+        type: otpType,
+        otpCode: fullCode
+      });
 
-    setIsLoading(false);
-
-    if (res.success) {
-      setIsSuccess(true);
-      setTimeout(() => {
-        setIsAuthOpen(false);
-        setStep('input');
-        setIsSuccess(false);
-      }, 1000);
-    } else {
-      setErrorMsg(res.error || 'Invalid 6-digit OTP code entered');
+      if (res && res.success) {
+        setIsSuccess(true);
+        setTimeout(() => {
+          setIsAuthOpen(false);
+          setStep('input');
+          setIsSuccess(false);
+        }, 1000);
+      } else {
+        setErrorMsg(res?.error || 'Invalid OTP code entered');
+      }
+    } catch (err) {
+      console.error('OTP Verify Error:', err);
+      setErrorMsg('Verification error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -263,7 +278,7 @@ export default function AuthModal() {
           </form>
         )}
 
-        {/* STEP 2: ENTER 6-DIGIT OTP (NO FAKE DISPLAY) */}
+        {/* STEP 2: ENTER 6-DIGIT OTP */}
         {step === 'otp' && (
           <div className="space-y-6">
 
