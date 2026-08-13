@@ -20,12 +20,24 @@ import { getTranslation, LANGUAGES } from '@/lib/i18n';
 
 const StoreContext = createContext();
 
+// Helper to deep clone products array so no two products share object/array memory references
+function cloneProductsArray(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map(p => ({
+    ...p,
+    id: String(p.id || '').trim(),
+    name: String(p.name || '').trim(),
+    images: Array.isArray(p.images) ? [...p.images] : [],
+    tags: Array.isArray(p.tags) ? [...p.tags] : []
+  }));
+}
+
 export function StoreProvider({ children }) {
   // 1. Language & i18n
   const [currentLanguage, setCurrentLanguage] = useState('en');
 
   // 2. Main Store Entities State (Single Shared Products & Machines Database)
-  const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  const [products, setProductsState] = useState(() => cloneProductsArray(INITIAL_PRODUCTS));
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [banners, setBanners] = useState(INITIAL_BANNERS);
   const [flashSale, setFlashSale] = useState(INITIAL_FLASH_SALE);
@@ -61,6 +73,13 @@ export function StoreProvider({ children }) {
 
   const broadcastChannelRef = useRef(null);
 
+  const setProducts = (newProductsOrFn) => {
+    setProductsState((prev) => {
+      const nextVal = typeof newProductsOrFn === 'function' ? newProductsOrFn(prev) : newProductsOrFn;
+      return cloneProductsArray(nextVal);
+    });
+  };
+
   // Safe Financial Calculations (NO GST)
   const cartSubtotal = (cart || []).reduce((sum, item) => {
     const unitPrice = Number(item.offerPrice ?? item.price ?? 0);
@@ -90,11 +109,12 @@ export function StoreProvider({ children }) {
       });
       const data = await res.json();
       if (data.success && Array.isArray(data.products)) {
-        setProducts((prev) => {
-          const isDifferent = JSON.stringify(prev) !== JSON.stringify(data.products);
+        const clonedServer = cloneProductsArray(data.products);
+        setProductsState((prev) => {
+          const isDifferent = JSON.stringify(prev) !== JSON.stringify(clonedServer);
           if (isDifferent) {
-            localStorage.setItem('hc_dtf_products', JSON.stringify(data.products));
-            return data.products;
+            localStorage.setItem('hc_dtf_products', JSON.stringify(clonedServer));
+            return clonedServer;
           }
           return prev;
         });
@@ -113,8 +133,9 @@ export function StoreProvider({ children }) {
       broadcastChannelRef.current = new BroadcastChannel('hc_dtf_realtime_products');
       broadcastChannelRef.current.onmessage = (event) => {
         if (event.data?.type === 'PRODUCTS_UPDATED' && Array.isArray(event.data.products)) {
-          setProducts(event.data.products);
-          localStorage.setItem('hc_dtf_products', JSON.stringify(event.data.products));
+          const clonedBroadcast = cloneProductsArray(event.data.products);
+          setProductsState(clonedBroadcast);
+          localStorage.setItem('hc_dtf_products', JSON.stringify(clonedBroadcast));
         }
       };
     }
@@ -190,7 +211,8 @@ export function StoreProvider({ children }) {
   const notifyRealtimeChannel = (updatedList) => {
     if (broadcastChannelRef.current) {
       try {
-        broadcastChannelRef.current.postMessage({ type: 'PRODUCTS_UPDATED', products: updatedList });
+        const cloned = cloneProductsArray(updatedList);
+        broadcastChannelRef.current.postMessage({ type: 'PRODUCTS_UPDATED', products: cloned });
       } catch (e) {}
     }
   };
@@ -474,22 +496,18 @@ export function StoreProvider({ children }) {
     localStorage.removeItem('hc_dtf_customer_session');
   };
 
-  // ================= REAL-TIME PRODUCT ACTIONS =================
+  // ================= ISOLATED REAL-TIME PRODUCT ACTIONS =================
   const addProduct = async (newProd) => {
+    const createdId = String(newProd.id || `prod_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`).trim();
     const created = {
-      id: newProd.id || `prod_${Date.now()}`,
+      id: createdId,
       slug: (newProd.name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       rating: 5.0,
       enabled: true,
       status: 'Published',
-      ...newProd
+      ...newProd,
+      images: Array.isArray(newProd.images) ? [...newProd.images] : []
     };
-
-    setProducts((prev) => {
-      const updated = [created, ...prev];
-      notifyRealtimeChannel(updated);
-      return updated;
-    });
 
     try {
       const res = await fetch('/api/products', {
@@ -499,9 +517,10 @@ export function StoreProvider({ children }) {
       });
       const data = await res.json();
       if (data.success && Array.isArray(data.products)) {
-        setProducts(data.products);
-        localStorage.setItem('hc_dtf_products', JSON.stringify(data.products));
-        notifyRealtimeChannel(data.products);
+        const cloned = cloneProductsArray(data.products);
+        setProductsState(cloned);
+        localStorage.setItem('hc_dtf_products', JSON.stringify(cloned));
+        notifyRealtimeChannel(cloned);
       }
     } catch (e) {
       console.error('Error saving product to database API:', e);
@@ -511,23 +530,19 @@ export function StoreProvider({ children }) {
   };
 
   const updateProduct = async (id, updatedFields) => {
-    setProducts((prev) => {
-      const updated = prev.map((p) => (p.id === id ? { ...p, ...updatedFields } : p));
-      notifyRealtimeChannel(updated);
-      return updated;
-    });
-
+    const targetIdStr = String(id).trim();
     try {
       const res = await fetch('/api/products', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, ...updatedFields })
+        body: JSON.stringify({ id: targetIdStr, ...updatedFields })
       });
       const data = await res.json();
       if (data.success && Array.isArray(data.products)) {
-        setProducts(data.products);
-        localStorage.setItem('hc_dtf_products', JSON.stringify(data.products));
-        notifyRealtimeChannel(data.products);
+        const cloned = cloneProductsArray(data.products);
+        setProductsState(cloned);
+        localStorage.setItem('hc_dtf_products', JSON.stringify(cloned));
+        notifyRealtimeChannel(cloned);
       }
     } catch (e) {
       console.error('Error updating product on database API:', e);
@@ -535,24 +550,19 @@ export function StoreProvider({ children }) {
   };
 
   const deleteProduct = async (id) => {
-    setProducts((prev) => {
-      const updated = prev.filter((p) => p.id !== id);
-      localStorage.setItem('hc_dtf_products', JSON.stringify(updated));
-      notifyRealtimeChannel(updated);
-      return updated;
-    });
-
+    const targetIdStr = String(id).trim();
     try {
-      const res = await fetch(`/api/products?id=${encodeURIComponent(id)}`, {
+      const res = await fetch(`/api/products?id=${encodeURIComponent(targetIdStr)}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
+        body: JSON.stringify({ id: targetIdStr })
       });
       const data = await res.json();
       if (data.success && Array.isArray(data.products)) {
-        setProducts(data.products);
-        localStorage.setItem('hc_dtf_products', JSON.stringify(data.products));
-        notifyRealtimeChannel(data.products);
+        const cloned = cloneProductsArray(data.products);
+        setProductsState(cloned);
+        localStorage.setItem('hc_dtf_products', JSON.stringify(cloned));
+        notifyRealtimeChannel(cloned);
       }
     } catch (e) {
       console.error('Error deleting product from database API:', e);
@@ -562,9 +572,10 @@ export function StoreProvider({ children }) {
   const duplicateProduct = (p) => {
     const dup = {
       ...p,
-      id: `prod_${Date.now()}`,
+      id: `prod_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       name: `${p.name} (Copy)`,
-      slug: `${p.slug || 'copy'}-${Date.now()}`
+      slug: `${p.slug || 'copy'}-${Date.now()}`,
+      images: Array.isArray(p.images) ? [...p.images] : []
     };
     addProduct(dup);
   };
@@ -745,7 +756,7 @@ export function StoreProvider({ children }) {
         setCategories,
         setBanners,
 
-        // Product CRUD (Real-Time Synchronized)
+        // Product CRUD (Strict Product Isolation)
         addProduct,
         updateProduct,
         deleteProduct,
