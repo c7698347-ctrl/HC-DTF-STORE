@@ -84,85 +84,8 @@ export const INITIAL_MACHINES_LIST = [
   }
 ];
 
-// PRODUCTION READY DTF PRODUCTS
-export const INITIAL_PRODUCTS = [
-  {
-    id: 'prod-101',
-    name: '3D Gold Zari Maggam Blouse Transfer Sheet (12x39)',
-    slug: '3d-gold-zari-maggam-blouse-transfer',
-    categoryId: 'cat-blouse',
-    category: 'Blouse Designs',
-    price: 399,
-    offerPrice: 299,
-    rating: 4.9,
-    stock: 150,
-    tags: ['maggam', 'zari', 'gold', 'blouse', 'neck'],
-    status: 'Published',
-    enabled: true,
-    isTrending: true,
-    isBestSeller: false,
-    isPremium: true,
-    images: ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'],
-    description: 'High-density 2400 DPI gold zari embroidered look DTF transfer sheet for blouse necklines.'
-  },
-  {
-    id: 'prod-102',
-    name: 'Royal Peacock Neckline DTF Print',
-    slug: 'royal-peacock-neckline-dtf-print',
-    categoryId: 'cat-neck',
-    category: 'Neck Designs',
-    price: 249,
-    offerPrice: 199,
-    rating: 4.8,
-    stock: 85,
-    tags: ['peacock', 'neck', 'royal', 'blue'],
-    status: 'Published',
-    enabled: true,
-    isTrending: true,
-    isBestSeller: true,
-    isPremium: false,
-    images: ['https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&q=80&w=800'],
-    description: 'Vibrant peacock feather motif DTF transfer sheet designed for front & back necklines.'
-  },
-  {
-    id: 'prod-103',
-    name: 'Diwali Gold Foil Lotus Border (1 Meter Roll)',
-    slug: 'diwali-gold-foil-lotus-border-1m',
-    categoryId: 'cat-saree',
-    category: 'Saree Borders',
-    price: 599,
-    offerPrice: 449,
-    rating: 5.0,
-    stock: 200,
-    tags: ['diwali', 'gold', 'lotus', 'saree', 'border'],
-    status: 'Published',
-    enabled: true,
-    isTrending: true,
-    isBestSeller: true,
-    isPremium: true,
-    images: ['https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&q=80&w=800'],
-    description: 'Continuous 1 meter gang roll for saree zari border enhancement.'
-  },
-  {
-    id: 'prod-104',
-    name: 'Cute Superhero Kids T-Shirt Patches Pack',
-    slug: 'cute-superhero-kids-patches-pack',
-    categoryId: 'cat-kids',
-    category: 'Kids Collection',
-    price: 199,
-    offerPrice: 149,
-    rating: 4.7,
-    stock: 120,
-    tags: ['kids', 'superhero', 'cartoon', 'patches'],
-    status: 'Published',
-    enabled: true,
-    isTrending: false,
-    isBestSeller: false,
-    isPremium: false,
-    images: ['https://images.unsplash.com/photo-1560506840-ec148e82a604?auto=format&fit=crop&q=80&w=800'],
-    description: 'A pack of 6 ready-to-press cartoon superhero patches for children apparel.'
-  }
-];
+// PRODUCTION READY DTF PRODUCTS (ADMIN CATALOG IS SOLE SOURCE OF TRUTH)
+export const INITIAL_PRODUCTS = [];
 
 export const INITIAL_BANNERS = [
   {

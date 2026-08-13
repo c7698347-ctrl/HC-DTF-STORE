@@ -1,18 +1,19 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Smartphone, Mail, CheckCircle2, Loader2, KeyRound, RefreshCw } from 'lucide-react';
+import { X, Smartphone, Mail, CheckCircle2, Loader2, KeyRound, RefreshCw, UserCheck } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
 export default function AuthModal() {
-  const { isAuthOpen, setIsAuthOpen, sendOtpApi, verifyOtpAndLogin } = useStore();
+  const { isAuthOpen, setIsAuthOpen, sendOtpApi, verifyOtpAndLogin, updateCustomerProfile } = useStore();
 
   const [otpType, setOtpType] = useState('mobile'); // 'mobile' or 'email'
   const [identifier, setIdentifier] = useState('');
   
   // OTP Step States
-  const [step, setStep] = useState('input'); // 'input', 'otp'
+  const [step, setStep] = useState('input'); // 'input', 'otp', 'profile_completion'
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
+  const [fullNameInput, setFullNameInput] = useState('');
 
   // UI Statuses
   const [isLoading, setIsLoading] = useState(false);
@@ -134,12 +135,20 @@ export default function AuthModal() {
       });
 
       if (res && res.success) {
-        setIsSuccess(true);
-        setTimeout(() => {
-          setIsAuthOpen(false);
-          setStep('input');
-          setIsSuccess(false);
-        }, 1000);
+        const user = res.user;
+        const hasValidName = user?.name && !user.name.startsWith('Customer ') && user.name.trim() !== '';
+
+        if (!hasValidName) {
+          // First-time customer requires Profile Name completion
+          setStep('profile_completion');
+        } else {
+          setIsSuccess(true);
+          setTimeout(() => {
+            setIsAuthOpen(false);
+            setStep('input');
+            setIsSuccess(false);
+          }, 1000);
+        }
       } else {
         setErrorMsg(res?.error || 'Invalid OTP code entered');
       }
@@ -149,6 +158,27 @@ export default function AuthModal() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSaveProfile = (e) => {
+    e.preventDefault();
+    const cleanName = fullNameInput.trim();
+    if (!cleanName) {
+      setErrorMsg('Please enter your Full Name');
+      return;
+    }
+
+    if (updateCustomerProfile) {
+      updateCustomerProfile({ name: cleanName });
+    }
+
+    setIsSuccess(true);
+    setTimeout(() => {
+      setIsAuthOpen(false);
+      setStep('input');
+      setIsSuccess(false);
+      setFullNameInput('');
+    }, 800);
   };
 
   return (
@@ -170,10 +200,16 @@ export default function AuthModal() {
             HC
           </div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-            {step === 'input' ? 'Customer Login' : 'Enter SMS OTP Code'}
+            {step === 'profile_completion' 
+              ? 'Complete Your Profile' 
+              : step === 'input' 
+              ? 'Customer Login' 
+              : 'Enter SMS OTP Code'}
           </h2>
           <p className="text-xs text-slate-500">
-            {step === 'input' 
+            {step === 'profile_completion'
+              ? 'Full Name and Mobile Number are required for order tracking'
+              : step === 'input' 
               ? 'Login or create account securely via SMS OTP' 
               : `Enter 6-digit SMS OTP code sent to +91 ${identifier}`}
           </p>
@@ -340,6 +376,50 @@ export default function AuthModal() {
             )}
 
           </div>
+        )}
+
+        {/* STEP 3: FIRST-TIME CUSTOMER MANDATORY PROFILE COMPLETION */}
+        {step === 'profile_completion' && (
+          <form onSubmit={handleSaveProfile} className="space-y-4">
+            
+            {isSuccess ? (
+              <div className="py-8 text-center space-y-2">
+                <CheckCircle2 size={48} className="mx-auto text-emerald-500 animate-bounce" />
+                <h3 className="font-black text-slate-900 text-lg">Profile Saved!</h3>
+                <p className="text-xs text-slate-500">Welcome to HC DTF STORE</p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Mobile Number (OTP Verified)</label>
+                  <div className="bg-slate-100 border border-slate-200 rounded-2xl px-4 py-3 text-xs font-bold text-slate-800">
+                    +91 {identifier}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter your full name"
+                    value={fullNameInput}
+                    onChange={(e) => setFullNameInput(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!fullNameInput.trim()}
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-xs shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition disabled:opacity-50"
+                >
+                  <UserCheck size={16} /> Save Profile & Complete Setup
+                </button>
+              </>
+            )}
+
+          </form>
         )}
 
       </div>
