@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { 
   DEFAULT_CATEGORIES, 
   INITIAL_PRODUCTS, 
@@ -59,6 +59,8 @@ export function StoreProvider({ children }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
+  const broadcastChannelRef = useRef(null);
+
   // Safe Financial Calculations (NO GST)
   const cartSubtotal = (cart || []).reduce((sum, item) => {
     const unitPrice = Number(item.offerPrice ?? item.price ?? 0);
@@ -79,22 +81,54 @@ export function StoreProvider({ children }) {
   const defaultShippingFee = 150;
   const cartTotal = taxableTotal + defaultShippingFee;
 
-  // Fetch products from single database API (/api/products)
+  // Real-Time Product Fetcher from single database API (/api/products)
   const fetchProductsFromApi = async () => {
     try {
-      const res = await fetch('/api/products', { cache: 'no-store' });
+      const res = await fetch(`/api/products?t=${Date.now()}`, { 
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store' }
+      });
       const data = await res.json();
       if (data.success && Array.isArray(data.products)) {
-        setProducts(data.products);
-        localStorage.setItem('hc_dtf_products', JSON.stringify(data.products));
+        setProducts((prev) => {
+          const isDifferent = JSON.stringify(prev) !== JSON.stringify(data.products);
+          if (isDifferent) {
+            localStorage.setItem('hc_dtf_products', JSON.stringify(data.products));
+            return data.products;
+          }
+          return prev;
+        });
       }
     } catch (e) {
       console.error('Error fetching products from database API:', e);
     }
   };
 
+  // REAL-TIME SYNCHRONIZATION ENGINE (BroadcastChannel + 2-second Polling + Window Focus)
   useEffect(() => {
     fetchProductsFromApi();
+
+    // 1. Setup BroadcastChannel for 0ms same-device multi-tab synchronization
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      broadcastChannelRef.current = new BroadcastChannel('hc_dtf_realtime_products');
+      broadcastChannelRef.current.onmessage = (event) => {
+        if (event.data?.type === 'PRODUCTS_UPDATED' && Array.isArray(event.data.products)) {
+          setProducts(event.data.products);
+          localStorage.setItem('hc_dtf_products', JSON.stringify(event.data.products));
+        }
+      };
+    }
+
+    // 2. Setup 2-second polling loop for cross-browser / cross-device real-time sync
+    const pollInterval = setInterval(() => {
+      fetchProductsFromApi();
+    }, 2000);
+
+    // 3. Setup Window Focus listener
+    const handleFocus = () => {
+      fetchProductsFromApi();
+    };
+    window.addEventListener('focus', handleFocus);
 
     try {
       const savedOrders = localStorage.getItem('hc_dtf_orders');
@@ -143,7 +177,23 @@ export function StoreProvider({ children }) {
     } catch (e) {
       console.error('LocalStorage load error', e);
     }
+
+    return () => {
+      clearInterval(pollInterval);
+      window.removeEventListener('focus', handleFocus);
+      if (broadcastChannelRef.current) {
+        broadcastChannelRef.current.close();
+      }
+    };
   }, []);
+
+  const notifyRealtimeChannel = (updatedList) => {
+    if (broadcastChannelRef.current) {
+      try {
+        broadcastChannelRef.current.postMessage({ type: 'PRODUCTS_UPDATED', products: updatedList });
+      } catch (e) {}
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem('hc_dtf_orders', JSON.stringify(orders));
@@ -347,7 +397,6 @@ export function StoreProvider({ children }) {
     } catch (e) {
       clearTimeout(timeoutId);
       console.warn('OTP API timeout or network fallback:', e);
-      // Fallback response if network latency occurs
       return { success: true, message: `OTP code dispatched to ${identifier}` };
     }
   };
@@ -425,7 +474,7 @@ export function StoreProvider({ children }) {
     localStorage.removeItem('hc_dtf_customer_session');
   };
 
-  // ================= PRODUCT ACTIONS =================
+  // ================= REAL-TIME PRODUCT ACTIONS =================
   const addProduct = async (newProd) => {
     const created = {
       id: newProd.id || `prod_${Date.now()}`,
@@ -436,7 +485,11 @@ export function StoreProvider({ children }) {
       ...newProd
     };
 
-    setProducts((prev) => [created, ...prev]);
+    setProducts((prev) => {
+      const updated = [created, ...prev];
+      notifyRealtimeChannel(updated);
+      return updated;
+    });
 
     try {
       const res = await fetch('/api/products', {
@@ -448,6 +501,7 @@ export function StoreProvider({ children }) {
       if (data.success && Array.isArray(data.products)) {
         setProducts(data.products);
         localStorage.setItem('hc_dtf_products', JSON.stringify(data.products));
+        notifyRealtimeChannel(data.products);
       }
     } catch (e) {
       console.error('Error saving product to database API:', e);
@@ -457,9 +511,11 @@ export function StoreProvider({ children }) {
   };
 
   const updateProduct = async (id, updatedFields) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...updatedFields } : p))
-    );
+    setProducts((prev) => {
+      const updated = prev.map((p) => (p.id === id ? { ...p, ...updatedFields } : p));
+      notifyRealtimeChannel(updated);
+      return updated;
+    });
 
     try {
       const res = await fetch('/api/products', {
@@ -471,6 +527,7 @@ export function StoreProvider({ children }) {
       if (data.success && Array.isArray(data.products)) {
         setProducts(data.products);
         localStorage.setItem('hc_dtf_products', JSON.stringify(data.products));
+        notifyRealtimeChannel(data.products);
       }
     } catch (e) {
       console.error('Error updating product on database API:', e);
@@ -481,6 +538,7 @@ export function StoreProvider({ children }) {
     setProducts((prev) => {
       const updated = prev.filter((p) => p.id !== id);
       localStorage.setItem('hc_dtf_products', JSON.stringify(updated));
+      notifyRealtimeChannel(updated);
       return updated;
     });
 
@@ -494,6 +552,7 @@ export function StoreProvider({ children }) {
       if (data.success && Array.isArray(data.products)) {
         setProducts(data.products);
         localStorage.setItem('hc_dtf_products', JSON.stringify(data.products));
+        notifyRealtimeChannel(data.products);
       }
     } catch (e) {
       console.error('Error deleting product from database API:', e);
@@ -686,7 +745,7 @@ export function StoreProvider({ children }) {
         setCategories,
         setBanners,
 
-        // Product CRUD
+        // Product CRUD (Real-Time Synchronized)
         addProduct,
         updateProduct,
         deleteProduct,
