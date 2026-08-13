@@ -1,0 +1,60 @@
+const fs = require('fs');
+const path = require('path');
+
+const dataFilePath = path.join(__dirname, '..', 'src', 'data', 'products.json');
+
+const liveStore = [
+  {
+    id: 'prod_1786627851305',
+    name: 'HCDFT 405',
+    slug: 'hcdft-405',
+    categoryId: 'cat-new',
+    category: 'New Arrivals',
+    price: 400,
+    offerPrice: 400,
+    stock: 100,
+    status: 'Published',
+    enabled: true,
+    isTrending: true,
+    isBestSeller: true,
+    images: ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'],
+    description: 'HCDFT 405 Premium DTF Transfer'
+  },
+  {
+    id: 'prod_1786627851307',
+    name: 'HCDFT 407',
+    slug: 'hcdft-407',
+    categoryId: 'cat-new',
+    category: 'New Arrivals',
+    price: 300,
+    offerPrice: 300,
+    stock: 150,
+    status: 'Published',
+    enabled: true,
+    isTrending: true,
+    isBestSeller: true,
+    images: ['https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&q=80&w=800'],
+    description: 'HCDFT 407 Premium DTF Print'
+  },
+  {
+    id: 'prod_1786627851306',
+    name: 'HCDFT 408',
+    slug: 'hcdft-408',
+    categoryId: 'cat-new',
+    category: 'New Arrivals',
+    price: 249,
+    offerPrice: 249,
+    stock: 1000,
+    status: 'Published',
+    enabled: true,
+    isTrending: true,
+    isBestSeller: true,
+    images: ['https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&q=80&w=800'],
+    description: 'HCDFT 408 Premium DTF Sheet'
+  }
+];
+
+fs.writeFileSync(dataFilePath, JSON.stringify(liveStore, null, 2), 'utf8');
+console.log('✅ Synchronized src/data/products.json with 3 Live Admin Products: HCDFT 405, HCDFT 407, HCDFT 408');
+console.log('Total Count:', liveStore.length);
+console.log('Products:', liveStore.map(p => `${p.name} (₹${p.price})`).join(', '));

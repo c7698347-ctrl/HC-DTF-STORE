@@ -16,7 +16,9 @@ import {
   Tag,
   AlertCircle,
   Flame,
-  Star
+  Star,
+  Image as ImageIcon,
+  Check
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import { DEFAULT_CATEGORIES } from '@/lib/store';
@@ -40,6 +42,7 @@ export default function AdminProductsPage() {
   const [isTrending, setIsTrending] = useState(false);
   const [isNewArrival, setIsNewArrival] = useState(true);
   const [images, setImages] = useState([]);
+  const [imageUrlInput, setImageUrlInput] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
 
   const resetForm = () => {
@@ -54,7 +57,16 @@ export default function AdminProductsPage() {
     setIsTrending(false);
     setIsNewArrival(true);
     setImages([]);
+    setImageUrlInput('');
     setEditingProduct(null);
+  };
+
+  const handleAddImageUrl = () => {
+    const url = imageUrlInput.trim();
+    if (!url) return;
+    // Prepend new image URL to index 0 so it becomes primary cover image
+    setImages((prev) => [url, ...prev.filter(i => i !== url)]);
+    setImageUrlInput('');
   };
 
   const handleImageFileUpload = (files) => {
@@ -64,7 +76,8 @@ export default function AdminProductsPage() {
       const reader = new FileReader();
       reader.onload = (e) => {
         const base64Url = e.target.result;
-        setImages((prev) => [...prev, base64Url]);
+        // Prepend newly uploaded image file to index 0 so it becomes primary cover image
+        setImages((prev) => [base64Url, ...prev.filter(i => i !== base64Url)]);
       };
       reader.readAsDataURL(file);
     });
@@ -78,7 +91,20 @@ export default function AdminProductsPage() {
     }
   };
 
-  const handleFormSubmit = (e) => {
+  const setAsCoverImage = (index) => {
+    if (index === 0) return;
+    setImages((prev) => {
+      const selected = prev[index];
+      const remaining = prev.filter((_, i) => i !== index);
+      return [selected, ...remaining];
+    });
+  };
+
+  const removeImage = (index) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
       alert('Please enter a product name');
@@ -87,25 +113,30 @@ export default function AdminProductsPage() {
 
     const selectedCat = DEFAULT_CATEGORIES.find(c => c.id === categoryId) || DEFAULT_CATEGORIES[0];
 
+    const finalImages = images.length > 0 
+      ? images 
+      : ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'];
+
     const payload = {
-      name,
+      name: name.trim(),
       categoryId: selectedCat.id,
       categoryName: selectedCat.name,
-      tags,
+      category: selectedCat.name,
+      tags: typeof tags === 'string' ? tags.split(',').map(t => t.trim()).filter(Boolean) : tags,
       price: Number(price) || 0,
       offerPrice: Number(offerPrice) || Number(price) || 0,
       stock: Number(stock) || 0,
-      description,
+      description: description || '',
       status,
       isTrending,
       isNewArrival,
-      images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800']
+      images: finalImages
     };
 
     if (editingProduct) {
-      updateProduct(editingProduct.id, payload);
+      await updateProduct(editingProduct.id, payload);
     } else {
-      addProduct(payload);
+      await addProduct(payload);
     }
 
     setShowAddModal(false);
@@ -114,37 +145,42 @@ export default function AdminProductsPage() {
 
   const handleEditClick = (p) => {
     setEditingProduct(p);
-    setName(p.name);
+    setName(p.name || '');
     setCategoryId(p.categoryId || DEFAULT_CATEGORIES.find(c => c.name.toLowerCase() === p.category?.toLowerCase())?.id || DEFAULT_CATEGORIES[0].id);
     setTags(Array.isArray(p.tags) ? p.tags.join(', ') : p.tags || '');
-    setPrice(p.price);
-    setOfferPrice(p.offerPrice);
-    setStock(p.stock);
+    setPrice(p.price || '');
+    setOfferPrice(p.offerPrice || '');
+    setStock(p.stock !== undefined ? p.stock : '100');
     setDescription(p.description || '');
     setStatus(p.status || 'Published');
     setIsTrending(!!p.isTrending);
     setIsNewArrival(p.isNewArrival !== false);
-    setImages(p.images || []);
+    setImages(Array.isArray(p.images) ? p.images : []);
+    setImageUrlInput('');
     setShowAddModal(true);
   };
 
-  const filteredProducts = products.filter((p) => {
+  const filteredProducts = (products || []).filter((p) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
-    const matchName = p.name.toLowerCase().includes(q);
+    const matchName = p.name?.toLowerCase().includes(q);
     const matchCat = p.category?.toLowerCase().includes(q);
     const matchTags = Array.isArray(p.tags) && p.tags.some(t => t.toLowerCase().includes(q));
     return matchName || matchCat || matchTags;
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 pb-12">
       
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 text-white p-6 rounded-3xl shadow-xl border border-slate-800">
         <div>
-          <h1 className="text-2xl sm:text-4xl font-black text-white">Product Catalog Manager</h1>
-          <p className="text-xs text-slate-400 mt-1">Upload & edit products, manage stock levels, set prices, and toggle Trending / New Arrivals</p>
+          <h1 className="text-2xl font-black flex items-center gap-2">
+            <Package className="text-emerald-400" /> Admin Product Catalog
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Single Source of Truth: Total Store Products ({products?.length || 0})
+          </p>
         </div>
 
         <button
@@ -152,150 +188,147 @@ export default function AdminProductsPage() {
             resetForm();
             setShowAddModal(true);
           }}
-          className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-black shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition"
+          className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition hover:scale-105"
         >
           <Plus size={18} /> Upload New Product
         </button>
       </div>
 
-      {/* Toolbar & Search */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900 p-4 rounded-2xl border border-slate-800">
-        <div className="relative w-full sm:w-80">
-          <input
-            type="text"
-            placeholder="Search by product name, category, or search tags..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-          />
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-        </div>
-
-        <span className="text-xs text-slate-400 font-bold">
-          Total Store Products: <strong className="text-white">{products.length}</strong>
-        </span>
+      {/* Filter / Search Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <Search size={18} className="text-slate-400" />
+        <input
+          type="text"
+          placeholder="Search products by title, category, or search tags..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none"
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-700">
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       {/* Products Table */}
-      <div className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider font-bold text-[11px]">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-extrabold uppercase tracking-wider">
               <tr>
-                <th className="p-4">Product</th>
-                <th className="p-4">Category</th>
-                <th className="p-4">Badges</th>
-                <th className="p-4">Price & Offer</th>
-                <th className="p-4">Stock</th>
-                <th className="p-4">Status</th>
-                <th className="p-4 text-right">Actions</th>
+                <th className="py-4 px-6">Product</th>
+                <th className="py-4 px-6">Category</th>
+                <th className="py-4 px-6">Price</th>
+                <th className="py-4 px-6">Stock</th>
+                <th className="py-4 px-6">Status</th>
+                <th className="py-4 px-6 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
-              {filteredProducts.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-12 text-center text-slate-500 font-bold space-y-2">
-                    <Package size={36} className="mx-auto text-slate-700" />
-                    <p className="text-white font-extrabold text-sm">No products found.</p>
-                    <p className="text-xs text-slate-500">Upload a product to publish it immediately to the store.</p>
-                  </td>
-                </tr>
-              ) : (
+            <tbody className="divide-y divide-slate-100 font-bold text-slate-800">
+              {filteredProducts.length > 0 ? (
                 filteredProducts.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-850 transition">
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={p.images?.[0] || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=200'}
-                          alt=""
-                          className="w-12 h-12 object-cover rounded-xl border border-slate-800"
-                        />
-                        <div>
-                          <p className="font-extrabold text-white text-xs">{p.name}</p>
-                          <p className="text-[10px] text-slate-500">ID: {p.id}</p>
+                  <tr key={p.id} className="hover:bg-slate-50/80 transition">
+                    <td className="py-4 px-6 flex items-center gap-3">
+                      <img
+                        src={p.images?.[0] || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'}
+                        alt={p.name}
+                        className="w-12 h-12 object-cover rounded-xl border border-slate-200 bg-slate-100"
+                      />
+                      <div>
+                        <p className="font-extrabold text-slate-900 text-sm">{p.name}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">ID: {p.id}</p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          {p.isNewArrival !== false && (
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] rounded-md font-extrabold">
+                              New Arrival
+                            </span>
+                          )}
+                          {p.isTrending && (
+                            <span className="px-2 py-0.5 bg-rose-100 text-rose-800 text-[10px] rounded-md font-extrabold">
+                              Trending
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>
 
-                    <td className="p-4">
-                      <span className="px-2.5 py-1 bg-emerald-950 text-emerald-400 font-extrabold text-[10px] rounded-full border border-emerald-800">
-                        {p.category || 'General'}
+                    <td className="py-4 px-6 text-slate-600">
+                      <span className="px-3 py-1 bg-slate-100 rounded-xl text-slate-700 font-extrabold">
+                        {p.category || p.categoryName || 'General'}
                       </span>
                     </td>
 
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-1">
-                        {p.isTrending && (
-                          <span className="px-2 py-0.5 bg-rose-950 text-rose-400 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-rose-800">
-                            <Flame size={10} /> Trending
-                          </span>
-                        )}
-                        {p.isNewArrival !== false && (
-                          <span className="px-2 py-0.5 bg-blue-950 text-blue-400 text-[10px] font-extrabold rounded-md flex items-center gap-1 border border-blue-800">
-                            <Sparkles size={10} /> New Arrival
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    <td className="p-4">
-                      <p className="font-extrabold text-white text-xs">₹{p.offerPrice}</p>
+                    <td className="py-4 px-6">
+                      <span className="text-slate-900 font-black text-sm">₹{p.offerPrice || p.price}</span>
                       {p.price > p.offerPrice && (
-                        <p className="text-[10px] text-slate-500 line-through">₹{p.price}</p>
+                        <span className="text-[11px] text-slate-400 line-through ml-1.5">₹{p.price}</span>
                       )}
                     </td>
 
-                    <td className="p-4">
-                      <span className={`font-bold ${p.stock > 10 ? 'text-emerald-400' : p.stock > 0 ? 'text-amber-400' : 'text-rose-400 font-black'}`}>
-                        {p.stock > 0 ? `${p.stock} units` : 'OUT OF STOCK'}
+                    <td className="py-4 px-6">
+                      <span className={`px-2.5 py-1 rounded-xl text-xs font-black ${
+                        p.stock > 10 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {p.stock} units
                       </span>
                     </td>
 
-                    <td className="p-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                        p.status === 'Published' || p.enabled !== false ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-slate-800 text-slate-400'
+                    <td className="py-4 px-6">
+                      <span className={`px-2.5 py-1 rounded-xl text-[11px] font-black ${
+                        p.status === 'Published' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
                       }`}>
                         {p.status || 'Published'}
                       </span>
                     </td>
 
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleEditClick(p)}
-                          className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
-                          title="Edit Product"
-                        >
-                          <Edit3 size={14} />
-                        </button>
-                        <button
-                          onClick={() => duplicateProduct(p)}
-                          className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
-                          title="Duplicate Product"
-                        >
-                          <Copy size={14} />
-                        </button>
-                        <button
-                          onClick={() => deleteProduct(p.id)}
-                          className="p-2 bg-rose-950/80 hover:bg-rose-900 text-rose-300 rounded-xl transition"
-                          title="Delete Product"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                    <td className="py-4 px-6 text-right space-x-2">
+                      <button
+                        onClick={() => handleEditClick(p)}
+                        className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition"
+                        title="Edit Product"
+                      >
+                        <Edit3 size={15} />
+                      </button>
+
+                      <button
+                        onClick={() => duplicateProduct(p)}
+                        className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl transition"
+                        title="Duplicate Product"
+                      >
+                        <Copy size={15} />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (confirm(`Are you sure you want to permanently delete "${p.name}"?`)) {
+                            deleteProduct(p.id);
+                          }
+                        }}
+                        className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition"
+                        title="Delete Product"
+                      >
+                        <Trash2 size={15} />
+                      </button>
                     </td>
                   </tr>
                 ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-400 font-bold">
+                    No products found in catalog.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* UPLOAD / EDIT PRODUCT MODAL */}
+      {/* CREATE / EDIT PRODUCT MODAL */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md" onClick={() => setShowAddModal(false)} />
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md" onClick={() => setShowAddModal(false)} />
 
           <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-white z-10 my-8 space-y-6 max-h-[90vh] overflow-y-auto">
             
@@ -316,7 +349,7 @@ export default function AdminProductsPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. 1 Meter Independence Freedom DTF Sheet (22×39)"
+                  placeholder="e.g. HCDFT 408 Premium DTF Sheet"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-white focus:outline-none focus:border-emerald-500 font-bold text-sm"
@@ -372,7 +405,7 @@ export default function AdminProductsPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. india, independence, tiranga, flag, aug15, freedom"
+                  placeholder="e.g. dtf, sheet, premium, hcdft408"
                   value={tags}
                   onChange={(e) => setTags(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-slate-200 focus:outline-none focus:border-emerald-500 font-mono"
@@ -386,7 +419,7 @@ export default function AdminProductsPage() {
                   <input
                     type="number"
                     required
-                    placeholder="499"
+                    placeholder="249"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-white focus:outline-none focus:border-emerald-500 font-bold"
@@ -398,7 +431,7 @@ export default function AdminProductsPage() {
                   <input
                     type="number"
                     required
-                    placeholder="399"
+                    placeholder="249"
                     value={offerPrice}
                     onChange={(e) => setOfferPrice(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-emerald-400 font-bold"
@@ -410,7 +443,7 @@ export default function AdminProductsPage() {
                   <input
                     type="number"
                     required
-                    placeholder="100"
+                    placeholder="1000"
                     value={stock}
                     onChange={(e) => setStock(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-white focus:outline-none focus:border-emerald-500"
@@ -431,20 +464,43 @@ export default function AdminProductsPage() {
                 </select>
               </div>
 
-              {/* Product Images Drag & Drop Uploader */}
-              <div>
-                <label className="block text-slate-300 font-bold mb-1.5">Product Images</label>
+              {/* PRODUCT IMAGE MANAGEMENT SECTION */}
+              <div className="space-y-3">
+                <label className="block text-slate-300 font-bold flex items-center justify-between">
+                  <span>Product Images (First Image is Main Cover)</span>
+                  <span className="text-[10px] text-emerald-400 font-extrabold">{images.length} Image(s) Attached</span>
+                </label>
+
+                {/* Direct Image URL Input */}
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="Paste direct Image URL (e.g. https://images.unsplash.com/...)"
+                    value={imageUrlInput}
+                    onChange={(e) => setImageUrlInput(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddImageUrl}
+                    disabled={!imageUrlInput.trim()}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-2xl text-xs font-bold shrink-0 transition"
+                  >
+                    Add Image URL
+                  </button>
+                </div>
+
+                {/* Drag & Drop File Upload */}
                 <div
                   onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
                   onDragLeave={() => setIsDragOver(false)}
                   onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-3xl p-6 text-center transition ${
+                  className={`border-2 border-dashed rounded-3xl p-4 text-center transition ${
                     isDragOver ? 'border-emerald-500 bg-emerald-950/20' : 'border-slate-800 bg-slate-950'
                   }`}
                 >
-                  <Upload size={28} className="mx-auto text-emerald-400 mb-2" />
-                  <p className="text-xs font-bold text-white">Drag & drop product images here</p>
-                  <p className="text-[11px] text-slate-500 mb-3">Supports JPG, PNG, WEBP</p>
+                  <Upload size={24} className="mx-auto text-emerald-400 mb-1" />
+                  <p className="text-xs font-bold text-white">Upload local image files (JPG, PNG, WEBP)</p>
 
                   <input
                     type="file"
@@ -456,23 +512,44 @@ export default function AdminProductsPage() {
                   />
                   <label
                     htmlFor="modal-img-input"
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold cursor-pointer inline-block transition"
+                    className="mt-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold cursor-pointer inline-block transition"
                   >
                     Browse Local Files
                   </label>
                 </div>
 
+                {/* IMAGE THUMBNAILS GALLERY WITH COVER BADGE & DELETE BUTTON */}
                 {images.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pt-3">
+                  <div className="grid grid-cols-4 gap-3 pt-2">
                     {images.map((img, idx) => (
-                      <div key={idx} className="relative w-16 h-16 group">
-                        <img src={img} alt="" className="w-full h-full object-cover rounded-xl border border-slate-700" />
+                      <div key={idx} className={`relative group rounded-2xl overflow-hidden border-2 transition ${
+                        idx === 0 ? 'border-emerald-500 shadow-md shadow-emerald-500/20' : 'border-slate-800'
+                      }`}>
+                        <img src={img} alt="" className="w-full h-24 object-cover bg-slate-950" />
+                        
+                        {/* Cover Image Badge */}
+                        {idx === 0 ? (
+                          <span className="absolute top-1 left-1 bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-md">
+                            <Check size={10} /> Cover
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setAsCoverImage(idx)}
+                            className="absolute top-1 left-1 bg-slate-900/90 hover:bg-emerald-600 text-slate-300 hover:text-white text-[9px] font-extrabold px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition shadow-md"
+                          >
+                            Set Cover
+                          </button>
+                        )}
+
+                        {/* Remove Image Button */}
                         <button
                           type="button"
-                          onClick={() => setImages((prev) => prev.filter((_, i) => i !== idx))}
-                          className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition"
+                          onClick={() => removeImage(idx)}
+                          className="absolute top-1 right-1 bg-rose-600 hover:bg-rose-700 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition shadow-md"
+                          title="Remove image"
                         >
-                          <X size={10} />
+                          <X size={12} />
                         </button>
                       </div>
                     ))}
@@ -501,15 +578,17 @@ export default function AdminProductsPage() {
                 >
                   Cancel
                 </button>
+
                 <button
                   type="submit"
-                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black shadow-lg shadow-emerald-600/30 transition"
+                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl shadow-lg shadow-emerald-600/30 flex items-center gap-2"
                 >
-                  {editingProduct ? 'Save Changes' : 'Publish Product Now'}
+                  <CheckCircle2 size={16} /> {editingProduct ? 'Save Product Changes' : 'Upload & Publish Product'}
                 </button>
               </div>
 
             </form>
+
           </div>
         </div>
       )}

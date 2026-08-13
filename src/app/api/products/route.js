@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { INITIAL_PRODUCTS } from '@/lib/store';
 
 const dataFilePath = path.join(process.cwd(), 'src', 'data', 'products.json');
 
-// Ensure directory and file exist with initial default products if empty
+// Read products array from disk database
 function getProductsFromDisk() {
   try {
     const dir = path.dirname(dataFilePath);
@@ -14,23 +13,20 @@ function getProductsFromDisk() {
     }
 
     if (!fs.existsSync(dataFilePath)) {
-      fs.writeFileSync(dataFilePath, JSON.stringify(INITIAL_PRODUCTS, null, 2), 'utf8');
-      return INITIAL_PRODUCTS;
+      fs.writeFileSync(dataFilePath, JSON.stringify([], null, 2), 'utf8');
+      return [];
     }
 
     const content = fs.readFileSync(dataFilePath, 'utf8');
     const parsed = JSON.parse(content || '[]');
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      // If file exists but is empty array, populate with INITIAL_PRODUCTS if not deleted
-      return parsed;
-    }
-    return parsed;
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
     console.error('Error reading products.json from disk:', e);
-    return INITIAL_PRODUCTS;
+    return [];
   }
 }
 
+// Write products array to disk database
 function saveProductsToDisk(products) {
   try {
     const dir = path.dirname(dataFilePath);
@@ -43,7 +39,7 @@ function saveProductsToDisk(products) {
   }
 }
 
-// GET /api/products - Read all products from database
+// GET /api/products - Read all products from canonical database
 export async function GET() {
   const products = getProductsFromDisk();
   return NextResponse.json({
@@ -56,18 +52,20 @@ export async function GET() {
   });
 }
 
-// POST /api/products - Insert a new product into database
+// POST /api/products - Insert or append a new product without replacing existing catalog
 export async function POST(req) {
   try {
     const body = await req.json();
     const currentProducts = getProductsFromDisk();
 
+    const productId = body.id || `prod_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+
     const newProd = {
-      id: body.id || `prod-${Date.now()}`,
+      id: productId,
       name: body.name?.trim() || 'Untitled Product',
       slug: (body.name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      categoryId: body.categoryId || 'cat-independence',
-      category: body.categoryName || body.category || 'Independence',
+      categoryId: body.categoryId || 'cat-new',
+      category: body.categoryName || body.category || 'New Arrivals',
       subcategory: body.subcategory || 'General',
       tags: Array.isArray(body.tags) ? body.tags : (typeof body.tags === 'string' ? body.tags.split(',').map(t => t.trim().toLowerCase()) : []),
       price: Number(body.price) || 0,
@@ -77,20 +75,28 @@ export async function POST(req) {
       description: body.description || '',
       images: Array.isArray(body.images) && body.images.length > 0 ? body.images : ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'],
       status: body.status || 'Published',
-      enabled: true,
-      isFeatured: true,
-      isTrending: true,
-      isBestSeller: true,
-      isPremium: true,
-      rating: 5.0,
-      reviewCount: 1,
-      createdAt: new Date().toISOString()
+      enabled: body.enabled !== false,
+      isFeatured: body.isFeatured !== false,
+      isTrending: body.isTrending !== false,
+      isBestSeller: body.isBestSeller !== false,
+      isPremium: body.isPremium !== false,
+      rating: body.rating || 5.0,
+      reviewCount: body.reviewCount || 1,
+      createdAt: body.createdAt || new Date().toISOString()
     };
 
-    const updatedProducts = [newProd, ...currentProducts];
-    saveProductsToDisk(updatedProducts);
+    // Deduplicate: If ID already exists, update in place; otherwise prepend
+    const existingIndex = currentProducts.findIndex(p => p.id === newProd.id);
+    let updatedProducts;
+    if (existingIndex >= 0) {
+      updatedProducts = [...currentProducts];
+      updatedProducts[existingIndex] = { ...updatedProducts[existingIndex], ...newProd };
+    } else {
+      updatedProducts = [newProd, ...currentProducts];
+    }
 
-    console.log('✅ [Database Engine] Saved new product to single database file:', newProd.name);
+    saveProductsToDisk(updatedProducts);
+    console.log(`✅ [Database Engine] Saved product ${newProd.name} (${newProd.id}). Total count: ${updatedProducts.length}`);
 
     return NextResponse.json({
       success: true,
@@ -111,17 +117,23 @@ export async function PUT(req) {
     const { id, ...updates } = body;
     let currentProducts = getProductsFromDisk();
 
-    currentProducts = currentProducts.map(p => {
-      if (p.id === id) {
-        return { ...p, ...updates };
-      }
-      return p;
-    });
+    const existingIndex = currentProducts.findIndex(p => p.id === id);
+    let updatedProducts;
 
-    saveProductsToDisk(currentProducts);
-    return NextResponse.json({ success: true, products: currentProducts });
+    if (existingIndex >= 0) {
+      updatedProducts = [...currentProducts];
+      updatedProducts[existingIndex] = { ...updatedProducts[existingIndex], ...updates };
+    } else {
+      // If product was missing on disk, append it safely
+      updatedProducts = [{ id, ...updates }, ...currentProducts];
+    }
+
+    saveProductsToDisk(updatedProducts);
+    console.log(`✏️ [Database Engine] Updated product ${id}. Total count: ${updatedProducts.length}`);
+    return NextResponse.json({ success: true, products: updatedProducts });
 
   } catch (error) {
+    console.error('PUT /api/products Error:', error);
     return NextResponse.json({ success: false, error: 'Failed to update product' }, { status: 500 });
   }
 }
@@ -147,7 +159,7 @@ export async function DELETE(req) {
     const updatedProducts = currentProducts.filter(p => p.id !== id);
 
     saveProductsToDisk(updatedProducts);
-    console.log('🗑️ [Database Engine] Permanently deleted product from disk:', id);
+    console.log(`🗑️ [Database Engine] Permanently deleted product ${id}. Remaining count: ${updatedProducts.length}`);
 
     return NextResponse.json({ success: true, products: updatedProducts });
 

@@ -21,19 +21,17 @@ import HeatPressSection from '@/components/home/HeatPressSection';
 export default function HomePage() {
   const { products = [] } = useStore();
 
-  // Published active DTF products from store database
+  // Published active DTF products from store database (Single Source of Truth)
   const dtfProducts = (products || []).filter(
     (p) => p.status !== 'Draft' && p.enabled !== false && p.categoryId !== 'cat-heatpress' && p.category !== 'HEAT PRESS MACHINES'
   );
 
-  // 4. NEW ARRIVALS (Newest 8 DTF products)
-  const newArrivals = dtfProducts.slice(0, 8);
-  const newArrivalIds = new Set(newArrivals.map((p) => p.id));
+  // 4. NEW ARRIVALS (All published DTF products)
+  const newArrivals = dtfProducts;
 
-  // 5. 🔥 TRENDING PRODUCTS (Products NOT in New Arrivals to guarantee ZERO DUPLICATES!)
-  const trendingCandidates = dtfProducts.filter((p) => !newArrivalIds.has(p.id));
-  const trendingProductsList = trendingCandidates.filter((p) => p.isTrending || p.isBestSeller);
-  const finalTrendingProducts = trendingProductsList.length > 0 ? trendingProductsList : trendingCandidates.slice(0, 8);
+  // 5. 🔥 TRENDING PRODUCTS (Products marked trending/bestseller or all published DTF products)
+  const trendingProductsList = dtfProducts.filter((p) => p.isTrending || p.isBestSeller);
+  const finalTrendingProducts = trendingProductsList.length > 0 ? trendingProductsList : dtfProducts;
 
   // Scroll references for horizontal sliders
   const newArrivalsRef = useRef(null);
@@ -73,31 +71,33 @@ export default function HomePage() {
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => scrollSlider(newArrivalsRef, 'left')}
-              className="p-2.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
-              title="Scroll Left"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <button
-              onClick={() => scrollSlider(newArrivalsRef, 'right')}
-              className="p-2.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
-              title="Scroll Right"
-            >
-              <ChevronRight size={20} />
-            </button>
-          </div>
+          {newArrivals.length > 3 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => scrollSlider(newArrivalsRef, 'left')}
+                className="p-2.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
+                title="Scroll Left"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <button
+                onClick={() => scrollSlider(newArrivalsRef, 'right')}
+                className="p-2.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
+                title="Scroll Right"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          )}
         </div>
 
         {newArrivals.length > 0 ? (
           <div
             ref={newArrivalsRef}
-            className="flex gap-6 overflow-x-auto scrollbar-none pb-6 pt-1 scroll-smooth snap-x snap-mandatory"
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
           >
             {newArrivals.map((prod) => (
-              <div key={prod.id} className="min-w-[270px] sm:min-w-[300px] max-w-[300px] shrink-0 snap-start">
+              <div key={prod.id} className="w-full">
                 <ProductCard product={prod} />
               </div>
             ))}
@@ -110,46 +110,50 @@ export default function HomePage() {
       </section>
 
       {/* 5. 🔥 TRENDING PRODUCTS (SINGLE SECTION - ZERO DUPLICATES) */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-200/80 pb-4">
-          <div className="flex items-center gap-3">
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              <Flame className="text-rose-500" size={26} /> 🔥 TRENDING PRODUCTS
-            </h2>
-            <span className="px-3 py-1 bg-rose-100 text-rose-800 rounded-full text-xs font-extrabold hidden sm:inline-block">
-              Most Popular
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => scrollSlider(trendingRef, 'left')}
-              className="p-2.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
-              title="Scroll Left"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <button
-              onClick={() => scrollSlider(trendingRef, 'right')}
-              className="p-2.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
-              title="Scroll Right"
-            >
-              <ChevronRight size={20} />
-            </button>
-          </div>
-        </div>
-
-        <div
-          ref={trendingRef}
-          className="flex gap-6 overflow-x-auto scrollbar-none pb-6 pt-1 scroll-smooth snap-x snap-mandatory"
-        >
-          {finalTrendingProducts.map((prod) => (
-            <div key={prod.id} className="min-w-[270px] sm:min-w-[300px] max-w-[300px] shrink-0 snap-start">
-              <ProductCard product={prod} />
+      {finalTrendingProducts.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-200/80 pb-4">
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <Flame className="text-rose-500" size={26} /> 🔥 TRENDING PRODUCTS
+              </h2>
+              <span className="px-3 py-1 bg-rose-100 text-rose-800 rounded-full text-xs font-extrabold hidden sm:inline-block">
+                Most Popular
+              </span>
             </div>
-          ))}
-        </div>
-      </section>
+
+            {finalTrendingProducts.length > 3 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => scrollSlider(trendingRef, 'left')}
+                  className="p-2.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
+                  title="Scroll Left"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  onClick={() => scrollSlider(trendingRef, 'right')}
+                  className="p-2.5 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition shadow-sm"
+                  title="Scroll Right"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div
+            ref={trendingRef}
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
+          >
+            {finalTrendingProducts.map((prod) => (
+              <div key={prod.id} className="w-full">
+                <ProductCard product={prod} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 6. CUSTOM GANG SHEETS BANNER */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
