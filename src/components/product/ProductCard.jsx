@@ -47,7 +47,7 @@ export default function ProductCard({ product }) {
       {/* Top Image Container - Clicking Navigates Directly to Product Detail Page */}
       <Link href={`/product/${product.slug || product.id}`} className="relative aspect-[4/3] bg-slate-100 overflow-hidden block">
         <img
-          src={product.images?.[0] || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'}
+          src={product.images?.[0] || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&q=80&w=800'}
           alt={product.name}
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
         />

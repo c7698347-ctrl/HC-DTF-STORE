@@ -18,9 +18,9 @@ const liveStore = [
     isTrending: true,
     isBestSeller: true,
     images: [
-      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'
+      'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&q=80&w=800'
     ],
-    description: 'HCDFT 405 Premium DTF Transfer Sheet',
+    description: 'HCDFT 405 Premium Silk Pattern DTF Transfer Sheet',
     updatedAt: new Date().toISOString()
   },
   {
@@ -58,12 +58,12 @@ const liveStore = [
     images: [
       'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&q=80&w=800'
     ],
-    description: 'HCDFT 408 Gold Zari Border DTF Transfer Sheet',
+    description: 'HCDFT 408 Gold Zari Border Saree DTF Transfer Sheet',
     updatedAt: new Date().toISOString()
   }
 ];
 
 fs.writeFileSync(dataFilePath, JSON.stringify(liveStore, null, 2), 'utf8');
-console.log('✅ Synchronized src/data/products.json with 3 Live Admin Products and Independent Valid Images');
+console.log('✅ Synchronized src/data/products.json with 3 Distinct Production Images (No Smoke Fallbacks)');
 console.log('Total Count:', liveStore.length);
-console.log('Products:', liveStore.map(p => `${p.name} -> Image: ${p.images[0]}`).join('\n'));
+console.log('Products:', liveStore.map(p => `${p.id} (${p.name}) -> Image: ${p.images[0]}`).join('\n'));
