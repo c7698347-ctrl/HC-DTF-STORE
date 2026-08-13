@@ -17,8 +17,11 @@ const liveStore = [
     enabled: true,
     isTrending: true,
     isBestSeller: true,
-    images: ['https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'],
-    description: 'HCDFT 405 Premium DTF Transfer'
+    images: [
+      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800'
+    ],
+    description: 'HCDFT 405 Premium DTF Transfer Sheet',
+    updatedAt: new Date().toISOString()
   },
   {
     id: 'prod_1786627851307',
@@ -33,8 +36,11 @@ const liveStore = [
     enabled: true,
     isTrending: true,
     isBestSeller: true,
-    images: ['https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&q=80&w=800'],
-    description: 'HCDFT 407 Premium DTF Print'
+    images: [
+      'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&q=80&w=800'
+    ],
+    description: 'HCDFT 407 Royal Peacock DTF Print',
+    updatedAt: new Date().toISOString()
   },
   {
     id: 'prod_1786627851306',
@@ -49,12 +55,15 @@ const liveStore = [
     enabled: true,
     isTrending: true,
     isBestSeller: true,
-    images: ['https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&q=80&w=800'],
-    description: 'HCDFT 408 Premium DTF Sheet'
+    images: [
+      'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&q=80&w=800'
+    ],
+    description: 'HCDFT 408 Gold Zari Border DTF Transfer Sheet',
+    updatedAt: new Date().toISOString()
   }
 ];
 
 fs.writeFileSync(dataFilePath, JSON.stringify(liveStore, null, 2), 'utf8');
-console.log('✅ Synchronized src/data/products.json with 3 Live Admin Products: HCDFT 405, HCDFT 407, HCDFT 408');
+console.log('✅ Synchronized src/data/products.json with 3 Live Admin Products and Independent Valid Images');
 console.log('Total Count:', liveStore.length);
-console.log('Products:', liveStore.map(p => `${p.name} (₹${p.price})`).join(', '));
+console.log('Products:', liveStore.map(p => `${p.name} -> Image: ${p.images[0]}`).join('\n'));
