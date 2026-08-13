@@ -1,25 +1,33 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { INITIAL_PRODUCTS } from '@/lib/store';
 
 const dataFilePath = path.join(process.cwd(), 'src', 'data', 'products.json');
 
-// Ensure directory and file exist
+// Ensure directory and file exist with initial default products if empty
 function getProductsFromDisk() {
   try {
-    if (!fs.existsSync(dataFilePath)) {
-      const dir = path.dirname(dataFilePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(dataFilePath, JSON.stringify([]), 'utf8');
-      return [];
+    const dir = path.dirname(dataFilePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
+
+    if (!fs.existsSync(dataFilePath)) {
+      fs.writeFileSync(dataFilePath, JSON.stringify(INITIAL_PRODUCTS, null, 2), 'utf8');
+      return INITIAL_PRODUCTS;
+    }
+
     const content = fs.readFileSync(dataFilePath, 'utf8');
-    return JSON.parse(content || '[]');
+    const parsed = JSON.parse(content || '[]');
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      // If file exists but is empty array, populate with INITIAL_PRODUCTS if not deleted
+      return parsed;
+    }
+    return parsed;
   } catch (e) {
     console.error('Error reading products.json from disk:', e);
-    return [];
+    return INITIAL_PRODUCTS;
   }
 }
 
@@ -43,7 +51,7 @@ export async function GET() {
     products
   }, {
     headers: {
-      'Cache-Control': 'no-store, max-age=0'
+      'Cache-Control': 'no-store, max-age=0, must-revalidate'
     }
   });
 }
@@ -118,19 +126,33 @@ export async function PUT(req) {
   }
 }
 
-// DELETE /api/products - Delete product by ID
+// DELETE /api/products - Delete product permanently by ID
 export async function DELETE(req) {
   try {
     const { searchParams } = new URL(req.url);
-    const id = searchParams.get('id');
+    let id = searchParams.get('id');
+
+    if (!id) {
+      try {
+        const body = await req.json();
+        id = body.id;
+      } catch (e) {}
+    }
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Product ID is required for deletion' }, { status: 400 });
+    }
+
     let currentProducts = getProductsFromDisk();
+    const updatedProducts = currentProducts.filter(p => p.id !== id);
 
-    currentProducts = currentProducts.filter(p => p.id !== id);
-    saveProductsToDisk(currentProducts);
+    saveProductsToDisk(updatedProducts);
+    console.log('🗑️ [Database Engine] Permanently deleted product from disk:', id);
 
-    return NextResponse.json({ success: true, products: currentProducts });
+    return NextResponse.json({ success: true, products: updatedProducts });
 
   } catch (error) {
+    console.error('DELETE /api/products Error:', error);
     return NextResponse.json({ success: false, error: 'Failed to delete product' }, { status: 500 });
   }
 }

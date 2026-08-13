@@ -404,13 +404,25 @@ export function StoreProvider({ children }) {
   };
 
   const deleteProduct = (id) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+    setProducts((prev) => {
+      const updated = prev.filter((p) => p.id !== id);
+      localStorage.setItem('hc_dtf_products', JSON.stringify(updated));
+      return updated;
+    });
 
-    fetch('/api/products', {
+    fetch(`/api/products?id=${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id })
-    }).catch(console.error);
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.products)) {
+          setProducts(data.products);
+          localStorage.setItem('hc_dtf_products', JSON.stringify(data.products));
+        }
+      })
+      .catch(console.error);
   };
 
   const duplicateProduct = (p) => {
