@@ -624,51 +624,127 @@ export function StoreProvider({ children }) {
 
   // ================= CART & WISHLIST ACTIONS =================
   const addToCart = (product, quantity = 1) => {
+    if (!product || typeof product !== 'object') {
+      console.warn('⚠️ [StoreContext] addToCart called with invalid product:', product);
+      return;
+    }
+
+    const targetId = String(product.id || product.productId || product._id || '').trim();
+    if (!targetId) {
+      console.warn('⚠️ [StoreContext] addToCart called with product lacking a valid ID:', product);
+      return;
+    }
+
+    const addedQty = Math.max(1, Number(quantity) || 1);
+    const availableStock = Number(product.stock) > 0 ? Number(product.stock) : 100;
+
+    if (product.stock === 0) {
+      alert(`Sorry, "${product.name || 'This item'}" is currently out of stock.`);
+      return;
+    }
+
     setCart((prev) => {
-      const existing = prev.find((item) => item.id === product.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.id === product.id ? { ...item, quantity: item.quantity + quantity } : item
-        );
+      const prevCart = Array.isArray(prev) ? prev : [];
+      const existingIndex = prevCart.findIndex((item) => String(item.id || item.productId).trim() === targetId);
+
+      if (existingIndex >= 0) {
+        return prevCart.map((item, idx) => {
+          if (idx === existingIndex) {
+            const newQty = Math.min(availableStock, (Number(item.quantity) || 1) + addedQty);
+            return {
+              ...item,
+              id: targetId,
+              quantity: newQty,
+              stock: availableStock
+            };
+          }
+          return item;
+        });
       }
-      return [...prev, { ...product, quantity }];
+
+      const normalizedProduct = {
+        ...product,
+        id: targetId,
+        name: product.name || 'DTF Design Sheet',
+        price: Number(product.price) || 0,
+        offerPrice: Number(product.offerPrice ?? product.price) || 0,
+        stock: availableStock,
+        quantity: Math.min(availableStock, addedQty),
+        images: Array.isArray(product.images) && product.images.length > 0 
+          ? [...product.images] 
+          : [product.image].filter(Boolean)
+      };
+
+      return [...prevCart, normalizedProduct];
     });
+
     setIsCartOpen(true);
   };
 
   const removeFromCart = (id) => {
-    setCart((prev) => prev.filter((item) => item.id !== id));
+    if (!id) return;
+    const targetId = String(id).trim();
+    setCart((prev) => (Array.isArray(prev) ? prev.filter((item) => String(item.id || item.productId).trim() !== targetId) : []));
   };
 
   const updateCartQuantity = (id, quantity) => {
-    if (quantity <= 0) {
-      removeFromCart(id);
+    if (!id) return;
+    const targetId = String(id).trim();
+    const newQty = Number(quantity);
+
+    if (isNaN(newQty) || newQty <= 0) {
+      removeFromCart(targetId);
       return;
     }
-    setCart((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, quantity } : item))
-    );
+
+    setCart((prev) => {
+      if (!Array.isArray(prev)) return [];
+      return prev.map((item) => {
+        if (String(item.id || item.productId).trim() === targetId) {
+          const maxStock = Number(item.stock) > 0 ? Number(item.stock) : 100;
+          return { ...item, quantity: Math.min(maxStock, newQty) };
+        }
+        return item;
+      });
+    });
   };
 
   const clearCart = () => setCart([]);
 
   const toggleWishlist = (product) => {
+    if (!product) return;
+    const targetId = String(product.id || product.productId || product._id || '').trim();
+    if (!targetId) return;
+
     setWishlist((prev) => {
-      const exists = prev.some((item) => item.id === product.id);
+      const prevWish = Array.isArray(prev) ? prev : [];
+      const exists = prevWish.some((item) => String(item.id || item.productId).trim() === targetId);
       if (exists) {
-        return prev.filter((item) => item.id !== product.id);
+        return prevWish.filter((item) => String(item.id || item.productId).trim() !== targetId);
       }
-      return [...prev, product];
+      return [...prevWish, { ...product, id: targetId }];
     });
   };
 
   const moveToBuyLater = (product) => {
-    removeFromCart(product.id);
-    setBuyLater((prev) => [...prev, product]);
+    if (!product) return;
+    const targetId = String(product.id || product.productId || product._id || '').trim();
+    if (!targetId) return;
+
+    removeFromCart(targetId);
+    setBuyLater((prev) => {
+      const prevList = Array.isArray(prev) ? prev : [];
+      if (prevList.some((item) => String(item.id || item.productId).trim() === targetId)) return prevList;
+      return [...prevList, { ...product, id: targetId }];
+    });
   };
 
   const moveBuyLaterToCart = (product) => {
-    setBuyLater((prev) => prev.filter((item) => item.id !== product.id));
+    if (!product) return;
+    const targetId = String(product.id || product.productId || product._id || '').trim();
+    if (!targetId) return;
+
+    setBuyLater((prev) => (Array.isArray(prev) ? prev.filter((item) => String(item.id || item.productId).trim() !== targetId) : []));
     addToCart(product);
   };
 

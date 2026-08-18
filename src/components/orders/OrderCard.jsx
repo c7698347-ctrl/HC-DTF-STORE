@@ -68,7 +68,7 @@ export default function OrderCard({ order }) {
 
   const handleBuyAgain = () => {
     (order.items || []).forEach((item) => {
-      addToCart(item, item.quantity || 1);
+      addToCart({ ...item, id: item.productId || item.id }, item.quantity || 1);
     });
     setIsCartOpen(true);
   };
