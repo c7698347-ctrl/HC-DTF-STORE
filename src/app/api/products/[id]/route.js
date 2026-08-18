@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import dbConnect, { isDbConnected } from '@/lib/mongodb';
 import Product from '@/models/Product';
 import fs from 'fs';
@@ -87,9 +88,11 @@ export async function DELETE(req, { params }) {
     let finalProducts = remainingDisk;
 
     if (isDbConnected()) {
-      await Product.deleteMany({
-        $or: [{ id: targetIdStr }, { _id: targetIdStr }]
-      });
+      let deleteFilter = { id: targetIdStr };
+      if (mongoose.Types.ObjectId.isValid(targetIdStr)) {
+        deleteFilter = { $or: [{ id: targetIdStr }, { _id: targetIdStr }] };
+      }
+      await Product.deleteMany(deleteFilter);
       const remainingDbProducts = await Product.find({}).sort({ createdAt: -1 }).lean();
       finalProducts = remainingDbProducts.map(p => ({ ...p, id: String(p.id).trim(), _id: String(p._id) }));
     }
