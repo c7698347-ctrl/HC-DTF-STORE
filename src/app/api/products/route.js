@@ -1,179 +1,173 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import dbConnect, { isDbConnected } from '@/lib/mongodb';
+import Product from '@/models/Product';
 
-const dataFilePath = path.join(process.cwd(), 'src', 'data', 'products.json');
+const diskDataPath = path.join(process.cwd(), 'src', 'data', 'products.json');
 
-// Deep clone product array to guarantee ZERO shared memory references between products
-function deepCloneProducts(arr) {
-  if (!Array.isArray(arr)) return [];
-  return arr.map(p => ({
-    ...p,
-    id: String(p.id || '').trim(),
-    name: String(p.name || '').trim(),
-    images: Array.isArray(p.images) ? [...p.images] : [],
-    tags: Array.isArray(p.tags) ? [...p.tags] : []
-  }));
-}
-
-// Read products array from disk database
+// Disk fallback utilities
 function getProductsFromDisk() {
   try {
-    const dir = path.dirname(dataFilePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    if (!fs.existsSync(dataFilePath)) {
-      fs.writeFileSync(dataFilePath, JSON.stringify([], null, 2), 'utf8');
-      return [];
-    }
-
-    const content = fs.readFileSync(dataFilePath, 'utf8');
+    const dir = path.dirname(diskDataPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (!fs.existsSync(diskDataPath)) fs.writeFileSync(diskDataPath, JSON.stringify([], null, 2), 'utf8');
+    const content = fs.readFileSync(diskDataPath, 'utf8');
     const parsed = JSON.parse(content || '[]');
-    return deepCloneProducts(parsed);
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    console.error('Error reading products.json from disk:', e);
+    console.error('Disk read error:', e);
     return [];
   }
 }
 
-// Write products array to disk database
 function saveProductsToDisk(products) {
   try {
-    const dir = path.dirname(dataFilePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    const clean = deepCloneProducts(products);
-    fs.writeFileSync(dataFilePath, JSON.stringify(clean, null, 2), 'utf8');
+    const dir = path.dirname(diskDataPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(diskDataPath, JSON.stringify(products, null, 2), 'utf8');
   } catch (e) {
-    console.error('Error writing products.json to disk:', e);
+    console.error('Disk write error:', e);
   }
 }
 
-// GET /api/products - Read all products from canonical database
-export async function GET() {
-  const products = getProductsFromDisk();
-  return NextResponse.json({
-    success: true,
-    products
-  }, {
-    headers: {
-      'Cache-Control': 'no-store, max-age=0, must-revalidate'
+// GET /api/products - Read all products from canonical MongoDB database
+export async function GET(req) {
+  try {
+    await dbConnect();
+
+    if (isDbConnected()) {
+      const dbProducts = await Product.find({}).sort({ createdAt: -1 }).lean();
+      const formatted = dbProducts.map(p => ({
+        ...p,
+        id: String(p.id).trim(),
+        _id: String(p._id)
+      }));
+      // Keep disk file synced with MongoDB canonical data
+      saveProductsToDisk(formatted);
+      return NextResponse.json({ success: true, products: formatted }, {
+        headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' }
+      });
     }
+  } catch (e) {
+    console.warn('MongoDB GET error, falling back to disk:', e.message);
+  }
+
+  const diskProducts = getProductsFromDisk();
+  return NextResponse.json({ success: true, products: diskProducts }, {
+    headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' }
   });
 }
 
-// POST /api/products - Insert or append a new product without touching existing sibling products
+// POST /api/products - Create new product document in MongoDB
 export async function POST(req) {
   try {
     const body = await req.json();
-    const currentProducts = getProductsFromDisk();
-
     const productId = String(body.id || `prod_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`).trim();
 
-    const newProd = {
+    const productData = {
       id: productId,
       name: body.name?.trim() || 'Untitled Product',
       slug: (body.name || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      sku: body.sku || `SKU-${Date.now()}`,
       categoryId: body.categoryId || 'cat-new',
       category: body.categoryName || body.category || 'New Arrivals',
       subcategory: body.subcategory || 'General',
       tags: Array.isArray(body.tags) ? [...body.tags] : (typeof body.tags === 'string' ? body.tags.split(',').map(t => t.trim().toLowerCase()) : []),
       price: Number(body.price) || 0,
       offerPrice: Number(body.offerPrice) || Number(body.price) || 0,
+      compareAtPrice: Number(body.compareAtPrice) || Number(body.price) || 0,
       discountPercent: Number(body.price) > 0 ? Math.round(((Number(body.price) - Number(body.offerPrice)) / Number(body.price)) * 100) : 0,
       stock: Number(body.stock) || 100,
       description: body.description || '',
       images: Array.isArray(body.images) && body.images.length > 0 
         ? [...body.images] 
-        : [`https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=800&id=${productId}`],
+        : [`https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&q=80&w=800&id=${productId}`],
       status: body.status || 'Published',
       enabled: body.enabled !== false,
-      isFeatured: body.isFeatured !== false,
+      isPublished: body.isPublished !== false,
       isTrending: body.isTrending !== false,
+      isNewArrival: body.isNewArrival !== false,
       isBestSeller: body.isBestSeller !== false,
       isPremium: body.isPremium !== false,
       rating: body.rating || 5.0,
-      reviewCount: body.reviewCount || 1,
-      createdAt: body.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      reviewCount: body.reviewCount || 1
     };
 
-    // Strict ID-based Deduplication: If ID exists, update in place; otherwise prepend
-    const existingIndex = currentProducts.findIndex(p => String(p.id).trim() === productId);
-    let updatedProducts;
-    if (existingIndex >= 0) {
-      updatedProducts = currentProducts.map(p => {
-        if (String(p.id).trim() === productId) {
-          return { ...p, ...newProd };
-        }
-        return p;
-      });
-    } else {
-      updatedProducts = [newProd, ...currentProducts];
+    await dbConnect();
+
+    if (isDbConnected()) {
+      const doc = await Product.findOneAndUpdate(
+        { id: productId },
+        { $set: productData },
+        { upsert: true, new: true, lean: true }
+      );
+
+      const allDbProducts = await Product.find({}).sort({ createdAt: -1 }).lean();
+      const formatted = allDbProducts.map(p => ({ ...p, id: String(p.id).trim(), _id: String(p._id) }));
+      saveProductsToDisk(formatted);
+
+      console.log(`🍃 [MongoDB Engine] Saved product ${doc.name} (${doc.id}). Count: ${formatted.length}`);
+      return NextResponse.json({ success: true, product: doc, products: formatted });
     }
 
-    saveProductsToDisk(updatedProducts);
-    console.log(`✅ [Database Engine] Saved product ${newProd.name} (${newProd.id}). Total count: ${updatedProducts.length}`);
-
-    return NextResponse.json({
-      success: true,
-      product: newProd,
-      products: updatedProducts
-    });
+    // Disk fallback if MongoDB disconnected
+    const disk = getProductsFromDisk();
+    const idx = disk.findIndex(p => String(p.id).trim() === productId);
+    let updated;
+    if (idx >= 0) {
+      updated = [...disk];
+      updated[idx] = { ...updated[idx], ...productData };
+    } else {
+      updated = [productData, ...disk];
+    }
+    saveProductsToDisk(updated);
+    return NextResponse.json({ success: true, product: productData, products: updated });
 
   } catch (error) {
     console.error('POST /api/products Error:', error);
-    return NextResponse.json({ success: false, error: 'Failed to insert product into database' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Failed to create product in database' }, { status: 500 });
   }
 }
 
-// PUT /api/products - Update target product strictly by ID without touching any sibling product
+// PUT /api/products - Update target product strictly by ID in MongoDB
 export async function PUT(req) {
   try {
     const body = await req.json();
     const { id, ...updates } = body;
+
     if (!id) {
       return NextResponse.json({ success: false, error: 'Product ID is required for update' }, { status: 400 });
     }
 
     const targetIdStr = String(id).trim();
-    let currentProducts = getProductsFromDisk();
+    await dbConnect();
 
-    const existingIndex = currentProducts.findIndex(p => String(p.id).trim() === targetIdStr);
-    let updatedProducts;
+    if (isDbConnected()) {
+      const updatedDoc = await Product.findOneAndUpdate(
+        { id: targetIdStr },
+        { $set: { ...updates, id: targetIdStr, updatedAt: new Date() } },
+        { new: true, lean: true }
+      );
 
-    if (existingIndex >= 0) {
-      updatedProducts = currentProducts.map(p => {
-        if (String(p.id).trim() === targetIdStr) {
-          return {
-            ...p,
-            ...updates,
-            id: targetIdStr, // Keep ID immutable
-            images: Array.isArray(updates.images) ? [...updates.images] : [...(p.images || [])],
-            tags: Array.isArray(updates.tags) ? [...updates.tags] : [...(p.tags || [])],
-            updatedAt: new Date().toISOString()
-          };
-        }
-        // Sibling products remain byte-for-byte untouched
-        return p;
-      });
-    } else {
-      // If product missing on disk, append safely as new record
-      const created = {
-        id: targetIdStr,
-        ...updates,
-        images: Array.isArray(updates.images) ? [...updates.images] : [],
-        updatedAt: new Date().toISOString()
-      };
-      updatedProducts = [created, ...currentProducts];
+      const allDbProducts = await Product.find({}).sort({ createdAt: -1 }).lean();
+      const formatted = allDbProducts.map(p => ({ ...p, id: String(p.id).trim(), _id: String(p._id) }));
+      saveProductsToDisk(formatted);
+
+      console.log(`✏️ [MongoDB Engine] Updated product ${targetIdStr} ONLY. Count: ${formatted.length}`);
+      return NextResponse.json({ success: true, product: updatedDoc, products: formatted });
     }
 
-    saveProductsToDisk(updatedProducts);
-    console.log(`✏️ [Database Engine] Updated product ${targetIdStr} ONLY. Sibling products untouched. Total count: ${updatedProducts.length}`);
-    return NextResponse.json({ success: true, products: updatedProducts });
+    // Disk fallback if MongoDB disconnected
+    const disk = getProductsFromDisk();
+    const updated = disk.map(p => {
+      if (String(p.id).trim() === targetIdStr) {
+        return { ...p, ...updates, id: targetIdStr, updatedAt: new Date().toISOString() };
+      }
+      return p;
+    });
+    saveProductsToDisk(updated);
+    return NextResponse.json({ success: true, products: updated });
 
   } catch (error) {
     console.error('PUT /api/products Error:', error);
@@ -181,7 +175,7 @@ export async function PUT(req) {
   }
 }
 
-// DELETE /api/products - Delete product permanently by ID without touching sibling products
+// DELETE /api/products - Delete target product permanently from MongoDB
 export async function DELETE(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -199,13 +193,23 @@ export async function DELETE(req) {
     }
 
     const targetIdStr = String(id).trim();
-    let currentProducts = getProductsFromDisk();
-    const updatedProducts = currentProducts.filter(p => String(p.id).trim() !== targetIdStr);
+    await dbConnect();
 
-    saveProductsToDisk(updatedProducts);
-    console.log(`🗑️ [Database Engine] Permanently deleted product ${targetIdStr}. Remaining count: ${updatedProducts.length}`);
+    if (isDbConnected()) {
+      await Product.deleteOne({ id: targetIdStr });
+      const remainingDbProducts = await Product.find({}).sort({ createdAt: -1 }).lean();
+      const formatted = remainingDbProducts.map(p => ({ ...p, id: String(p.id).trim(), _id: String(p._id) }));
+      saveProductsToDisk(formatted);
 
-    return NextResponse.json({ success: true, products: updatedProducts });
+      console.log(`🗑️ [MongoDB Engine] Permanently deleted product ${targetIdStr}. Remaining: ${formatted.length}`);
+      return NextResponse.json({ success: true, products: formatted });
+    }
+
+    // Disk fallback if MongoDB disconnected
+    const disk = getProductsFromDisk();
+    const updated = disk.filter(p => String(p.id).trim() !== targetIdStr);
+    saveProductsToDisk(updated);
+    return NextResponse.json({ success: true, products: updated });
 
   } catch (error) {
     console.error('DELETE /api/products Error:', error);
