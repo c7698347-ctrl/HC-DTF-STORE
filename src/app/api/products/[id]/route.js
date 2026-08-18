@@ -64,17 +64,42 @@ export async function PATCH(req, { params }) {
   }
 }
 
-// DELETE /api/products/[id] - Delete single product by ID
+// DELETE /api/products/[id] - Delete single product by ID permanently
 export async function DELETE(req, { params }) {
   try {
-    const targetId = String(params?.id || '').trim();
-    await dbConnect();
-
-    if (isDbConnected()) {
-      await Product.deleteOne({ id: targetId });
+    const targetIdStr = String(params?.id || '').trim();
+    if (!targetIdStr) {
+      return NextResponse.json({ success: false, error: 'Product ID is required' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, message: `Product ${targetId} deleted permanently` });
+    // 1. Remove from Disk Persistence
+    const disk = getProductsFromDisk();
+    const remainingDisk = disk.filter(p => String(p.id).trim() !== targetIdStr);
+
+    try {
+      const dir = path.dirname(diskDataPath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(diskDataPath, JSON.stringify(remainingDisk, null, 2), 'utf8');
+    } catch (e) {}
+
+    // 2. Remove from MongoDB Database
+    await dbConnect();
+    let finalProducts = remainingDisk;
+
+    if (isDbConnected()) {
+      await Product.deleteMany({
+        $or: [{ id: targetIdStr }, { _id: targetIdStr }]
+      });
+      const remainingDbProducts = await Product.find({}).sort({ createdAt: -1 }).lean();
+      finalProducts = remainingDbProducts.map(p => ({ ...p, id: String(p.id).trim(), _id: String(p._id) }));
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Product ${targetIdStr} deleted permanently`,
+      deletedId: targetIdStr,
+      products: finalProducts
+    });
   } catch (e) {
     return NextResponse.json({ success: false, error: 'Failed to delete product' }, { status: 500 });
   }

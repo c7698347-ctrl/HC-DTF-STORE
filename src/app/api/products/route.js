@@ -175,7 +175,7 @@ export async function PUT(req) {
   }
 }
 
-// DELETE /api/products - Delete target product permanently from MongoDB
+// DELETE /api/products - Delete target product permanently from MongoDB & disk persistence
 export async function DELETE(req) {
   try {
     const { searchParams } = new URL(req.url);
@@ -184,7 +184,7 @@ export async function DELETE(req) {
     if (!id) {
       try {
         const body = await req.json();
-        id = body.id;
+        id = body.id || body.productId;
       } catch (e) {}
     }
 
@@ -193,26 +193,37 @@ export async function DELETE(req) {
     }
 
     const targetIdStr = String(id).trim();
+
+    // 1. Remove from Disk File Persistence
+    const disk = getProductsFromDisk();
+    const remainingDisk = disk.filter(p => String(p.id).trim() !== targetIdStr);
+    saveProductsToDisk(remainingDisk);
+
+    // 2. Remove from MongoDB Canonical Database
     await dbConnect();
+    let finalProducts = remainingDisk;
 
     if (isDbConnected()) {
-      await Product.deleteOne({ id: targetIdStr });
+      await Product.deleteMany({
+        $or: [{ id: targetIdStr }, { _id: targetIdStr }]
+      });
       const remainingDbProducts = await Product.find({}).sort({ createdAt: -1 }).lean();
-      const formatted = remainingDbProducts.map(p => ({ ...p, id: String(p.id).trim(), _id: String(p._id) }));
-      saveProductsToDisk(formatted);
-
-      console.log(`🗑️ [MongoDB Engine] Permanently deleted product ${targetIdStr}. Remaining: ${formatted.length}`);
-      return NextResponse.json({ success: true, products: formatted });
+      finalProducts = remainingDbProducts.map(p => ({ ...p, id: String(p.id).trim(), _id: String(p._id) }));
+      saveProductsToDisk(finalProducts);
+      console.log(`🗑️ [MongoDB Engine] Permanently deleted product ${targetIdStr}. Remaining count: ${finalProducts.length}`);
     }
 
-    // Disk fallback if MongoDB disconnected
-    const disk = getProductsFromDisk();
-    const updated = disk.filter(p => String(p.id).trim() !== targetIdStr);
-    saveProductsToDisk(updated);
-    return NextResponse.json({ success: true, products: updated });
+    return NextResponse.json({
+      success: true,
+      message: `Product ${targetIdStr} permanently deleted`,
+      deletedId: targetIdStr,
+      products: finalProducts
+    }, {
+      headers: { 'Cache-Control': 'no-store, max-age=0, must-revalidate' }
+    });
 
   } catch (error) {
     console.error('DELETE /api/products Error:', error);
-    return NextResponse.json({ success: false, error: 'Failed to delete product' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Failed to delete product from database' }, { status: 500 });
   }
 }

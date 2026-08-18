@@ -550,19 +550,44 @@ export function StoreProvider({ children }) {
   };
 
   const deleteProduct = async (id) => {
+    if (!id) return;
     const targetIdStr = String(id).trim();
+
+    // 1. Immediate 0ms Optimistic UI Removal in React State
+    setProductsState((prev) => {
+      const prevList = Array.isArray(prev) ? prev : [];
+      const filtered = prevList.filter((p) => String(p.id).trim() !== targetIdStr);
+      localStorage.setItem('hc_dtf_products', JSON.stringify(filtered));
+      notifyRealtimeChannel(filtered);
+      return filtered;
+    });
+
     try {
+      // 2. Permanent Backend Database & Disk Deletion
       const res = await fetch(`/api/products?id=${encodeURIComponent(targetIdStr)}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: targetIdStr })
       });
       const data = await res.json();
+
       if (data.success && Array.isArray(data.products)) {
         const cloned = cloneProductsArray(data.products);
         setProductsState(cloned);
         localStorage.setItem('hc_dtf_products', JSON.stringify(cloned));
         notifyRealtimeChannel(cloned);
+      } else {
+        // Fallback to /api/products/[id]
+        const fallbackRes = await fetch(`/api/products/${encodeURIComponent(targetIdStr)}`, {
+          method: 'DELETE'
+        });
+        const fallbackData = await fallbackRes.json();
+        if (fallbackData.success && Array.isArray(fallbackData.products)) {
+          const cloned = cloneProductsArray(fallbackData.products);
+          setProductsState(cloned);
+          localStorage.setItem('hc_dtf_products', JSON.stringify(cloned));
+          notifyRealtimeChannel(cloned);
+        }
       }
     } catch (e) {
       console.error('Error deleting product from database API:', e);
